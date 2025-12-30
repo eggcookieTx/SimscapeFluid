@@ -46,6 +46,39 @@ This document compiles research findings on integrating MATLAB Simscape Fluid mo
 - Can achieve real-time simulation on high-end workstations
 - Supports parallel computing for multiple simulation scenarios
 
+### 1.6 Data Extraction for Visualization
+**Critical for Unreal Integration:** Visualizing flow inside networks requires state data at multiple component ports, not just discrete sensor locations.
+
+**Three Approaches:**
+
+1. **Simscape Data Logging (simlog) - RECOMMENDED**
+   - Automatically captures all port states without manual sensor placement
+   - Access via: `simlog.BlockName.PortName.p` (pressure), `.q` (flow rate), `.T` (temperature)
+   - Available for ALL conserving ports in the network
+   - Zero performance overhead - data collected during normal simulation
+   - Post-processing: Extract data and stream via UDP to Unreal
+   - Example: `simlog.Cylinder.A.p` gives cap-end pressure over time
+
+2. **Manual Sensor Placement**
+   - Add Pressure Sensor (IL) and Flow Rate Sensor (IL) at strategic locations
+   - Requires PS-Simulink Converter for each sensor
+   - More explicit but requires sensor management overhead
+   - Limited to manually placed locations
+   - Better for real-time streaming (sensors output Simulink signals directly)
+
+3. **Hybrid Approach - RECOMMENDED FOR THIS PROJECT**
+   - Use simlog for comprehensive post-simulation analysis
+   - Add strategic sensors for key visualization points (pump outlet, cylinder ports)
+   - Simlog provides full network state backup
+   - Sensors provide real-time streaming capability
+   - Best of both worlds: comprehensive data + real-time visualization
+
+**Implementation Notes:**
+- Enable data logging: `set_param(modelName, 'DataLoggingOverride', 'on')`
+- Access simlog after simulation: `out = sim(modelName); simlog = out.simlog;`
+- Extract time-series: `pressure_data = simlog.Cylinder.A.p.series.values;`
+- For Unreal: Stream selected simlog data via UDP at visualization frame rate
+
 ---
 
 ## 2. Unreal Engine Overview
@@ -326,11 +359,34 @@ Unreal Engine (Direct integration)
 4. Map fluid pressure → visual feedback (color, scale, position)
 5. Test synchronization and latency
 
-### Phase 2: Advanced Simulation
-1. Complex multi-component Simscape model
-2. Control feedback (Unreal → MATLAB)
-3. Data logging and analysis
-4. Real-time visualization improvements
+### Phase 2: Multi-Point Data Collection & Streaming
+1. **Enable Simscape Data Logging (simlog)**
+   - Configure model for automatic port state capture
+   - Extract pressure, flow rate, temperature at all component ports
+   - No manual sensor placement needed for comprehensive data
+
+2. **Add Strategic Sensors for Real-Time Streaming**
+   - Pressure Sensor (IL) at pump outlet
+   - Flow Rate Sensor (IL) at pump outlet  
+   - Pressure Sensors at cylinder ports (A & B)
+   - Position sensor on cylinder rod
+   - Convert to Simulink signals via PS-Simulink Converter
+
+3. **UDP Data Streaming Implementation**
+   - Stream sensor signals in real-time during simulation
+   - Post-process simlog data for additional visualization points
+   - Design data packet structure for Unreal (JSON or binary)
+   - Implement frame-rate appropriate data transmission (30-60 Hz)
+
+4. **Unreal Receiver Setup**
+   - Create UDP socket listener in Unreal
+   - Parse incoming data packets
+   - Map data to visual elements (pipe colors, flow particles, pressure indicators)
+
+5. **Validation & Performance Testing**
+   - Verify data accuracy (simlog vs sensors)
+   - Test latency and synchronization
+   - Optimize data packet size and transmission rate
 
 ### Phase 3: Production Integration
 1. Optimization for target performance metrics

@@ -114,35 +114,68 @@ This document is designed for LLM context. It can be detailed and verbose to pro
 - Simulation runs to completion
 - Results match expected hydraulic behavior
 
-### Phase 2: Simulation Data Collection (UDP)
-**Objective:** Extract simulation data and stream via UDP
+### Phase 2: Multi-Point Data Collection & UDP Streaming
+**Objective:** Extract comprehensive port-level state data and stream to Unreal for flow visualization
+
+**Critical Requirement:** Flow visualization requires state data at MULTIPLE component ports, not just discrete sensor locations.
+
+**Data Extraction Strategy - Hybrid Approach:**
+
+**Part A: Simscape Data Logging (simlog) - Comprehensive Network State**
+- Enable automatic logging of ALL port states (pressure, flow, temperature)
+- Access via: `simlog.BlockName.PortName.p`, `.q`, `.T`
+- Zero manual sensor placement needed
+- Provides complete network state for post-processing
+- Extract data for: FlowSource, ReliefValve, VentValve, DirectionalValve (all ports), CheckValve, FlowRestriction, Filter, Cylinder, Tank
+
+**Part B: Strategic Real-Time Sensors - Key Visualization Points**
+- Add Pressure Sensor (IL) at pump outlet (main line pressure)
+- Add Flow Rate Sensor (IL) at pump outlet (system flow)
+- Add Pressure Sensors at cylinder ports A & B (actuation monitoring)
+- Add Position Sensor on cylinder rod (motion tracking)
+- Convert all to Simulink signals via PS-Simulink Converter blocks
 
 **Tasks:**
-1. Identify key simulation outputs
-   - Pressure at key points
-   - Flow rates through components
-   - Cylinder position and velocity
-   - Motor torque and speed
+
+1. **Configure Simscape Data Logging**
+   - Enable simlog in model settings
+   - Test data extraction post-simulation
+   - Document port naming structure for all 10 blocks
+   - Create extraction script for simlog → structured data
    
-2. Implement UDP sender in MATLAB
-   - Add UDP transmission blocks/code to Simscape model
-   - Serialize data (JSON or binary format)
-   - Configure send rate (100-1000 Hz)
+2. **Add Real-Time Sensors to Model**
+   - Place 4-5 strategic sensors at key points
+   - Add PS-Simulink converters
+   - Wire to UDP send blocks
+   - Validate sensor outputs match expected values
    
-3. Data logging and verification
-   - Log transmitted data
-   - Verify data integrity
-   - Measure transmission latency
+3. **Implement UDP Data Streaming**
+   - Design data packet structure (JSON or binary)
+     * Real-time: Sensor values (4-5 points)
+     * Batch: simlog port states (20+ points)
+   - Add UDP Send blocks to model
+   - Configure transmission rate (30-60 Hz for real-time, 10 Hz for batch)
+   - Test data transmission to localhost
+   
+4. **Data Validation & Verification**
+   - Compare simlog vs sensor values (cross-validation)
+   - Measure UDP transmission latency
+   - Verify no packet loss over extended runs
+   - Document data format and port mapping
 
 **Deliverables:**
-- Modified .slx model with UDP sender
-- Data format specification document
+- Modified .slx model with simlog enabled + strategic sensors
+- simlog extraction script (MATLAB)
+- UDP data packet format specification
+- Port-to-visualization mapping document
 - UDP transmission test results
 
 **Success Criteria:**
-- Data transmitted at target rate
-- Latency < 10ms
+- simlog captures all 20+ port states successfully
+- Real-time sensors transmit at 30+ Hz
+- Latency < 20ms for real-time data
 - No data loss over 5+ minute runs
+- Complete network state available for visualization
 
 ### Phase 3: Unreal Layout Modeling
 **Objective:** Create 3D representation of hydraulic system in Unreal
