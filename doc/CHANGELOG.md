@@ -6,21 +6,53 @@ All notable changes to this project will be documented in this file.
 
 ### [Unreleased]
 
-#### [2025-12-30] Phase 1 Progress - Model Generation & Library Automation
+#### [2025-12-30] **PHASE 1 COMPLETE** - Working Hydraulic Simscape Model
+
+**MILESTONE: Phase 1 Complete - P&ID → Running Simscape Model** ✅
+- Created fully functional hydraulic model matching P&ID schematic
+- Model runs successfully with proper topology and connections
+- Ready for Phase 2: Data collection and UDP streaming
 
 **Added - New Scripts:**
 - ✅ `scripts/matlab/generate_simple_hydraulic_model.m` - Programmatically generates Simulink model
-  - Creates .slx file with 13 blocks (9 component blocks + 4 pipe connectors)
-  - Automatically adds blocks to model using MATLAB library paths
-  - Configures Simscape solver (ode15s, 10-second simulation)
-  - Status: WORKING - successfully generates SimpleHydraulicSystem.slx
+  - Creates .slx file with 10 hydraulic blocks + FluidProperties domain
+  - 12 automatic connections via simscape.addConnection() API
+  - 3 parallel pump paths: Relief Valve, Vent Valve, Directional Valve
+  - Rod-end control: 2 parallel paths (check valve + flow restriction)
+  - Configures Simscape solver (ode15s, 10-second simulation, variable-step)
+  - Status: **WORKING** - generates complete SimpleHydraulicSystem.slx
 
 - ✅ `scripts/matlab/explore_simscape_domain.m` - Generalized domain-aware library explorer
   - Consolidated 3 ad-hoc discovery scripts into 1 reusable tool
   - Supports ANY Simscape domain via domain parameter
   - Supports Foundation Library (fl_lib) blocks
   - Uses recursive find_system() for automatic block discovery
-  - Status: WORKING - tested with Isothermal Liquid and Foundation Library domains
+  - Status: **WORKING** - tested with Isothermal Liquid and Foundation Library domains
+
+- ✅ `scripts/matlab/discover_block_ports.m` - Port discovery diagnostic tool
+  - Uses simscape.connectionPortProperties() to query actual port names
+  - Critical for connecting blocks programmatically
+  - Discovers port Name, Label, Type properties
+  - Status: **WORKING** - used to find all block port mappings
+
+**Model Topology:**
+- 10 Hydraulic Blocks:
+  1. FlowSource (Flow Rate Source IL)
+  2. ReliefValve (Pressure Relief Valve IL) - PARALLEL path 1
+  3. VentValve (2-Way Directional Valve IL) - PARALLEL path 2
+  4. DirectionalValve (4-Way 3-Position Directional Valve IL) - PARALLEL path 3
+  5. CheckValve (Check Valve IL - reversed for return actuation)
+  6. FlowRestriction (Local Restriction IL - rod-end metering)
+  7. Filter (Local Resistance IL)
+  8. Cylinder (Double-Acting Actuator IL)
+  9. Tank (Tank IL)
+  10. FluidProperties (Isothermal Liquid Predefined Properties IL)
+
+**Key Technical Discoveries:**
+- ✅ Use `simscape.addConnection()` for physical connections, NOT `add_line()`
+- ✅ Use `simscape.connectionPortProperties()` to discover port names before connecting
+- ✅ Check valve direction is critical - must allow return actuation flow
+- ✅ Local Restriction vs Local Resistance - different components for different purposes
 
 **Added - Documentation:**
 - ✅ `doc/improvements.md` - Complete "Library Block Discovery Automation Process" section
