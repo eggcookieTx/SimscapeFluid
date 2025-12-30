@@ -177,6 +177,121 @@ This document is designed for LLM context. It can be detailed and verbose to pro
 - No data loss over 5+ minute runs
 - Complete network state available for visualization
 
+**Detailed Implementation Guide:**
+
+**A. Simlog Data Logging Setup**
+
+Enable automatic logging in model:
+```matlab
+% Configure model for comprehensive data logging
+modelName = 'SimpleHydraulicSystem';
+load_system('../../models/simscape/SimpleHydraulicSystem.slx');
+
+% Enable data logging
+set_param(modelName, 'DataLoggingOverride', 'on');
+set_param(modelName, 'DataLoggingDecimation', '1');  % Log every step
+set_param(modelName, 'DataLoggingMaxPoints', '10000');  % Max points
+
+% Run and access data
+out = sim(modelName);
+simlog = out.simlog;
+```
+
+**Data Points Available (20+ ports):**
+1. FlowSource: A (inlet), B (outlet)
+2. ReliefValve: A (inlet), B (tank return)
+3. VentValve: A (inlet), B (outlet)
+4. DirectionalValve: P (pump), T (tank), A (cap-end), B (rod-end)
+5. CheckValve: A (inlet), B (outlet)
+6. FlowRestriction: A (inlet), B (outlet)
+7. Filter: A (inlet), B (outlet)
+8. Cylinder: A (cap-end), B (rod-end)
+9. Tank: A (inlet)
+
+Per port data: `.p` (pressure), `.q` (flow rate), `.T` (temperature), `.series.time`, `.series.values`
+
+**B. Strategic Sensor Placement (5 sensors)**
+
+1. **Pump Outlet Pressure** - FlowSource.B → DirectionalValve.P junction
+2. **Pump Outlet Flow** - Same location
+3. **Cylinder Cap-End Pressure** - DirectionalValve.A → Cylinder.A
+4. **Cylinder Rod-End Pressure** - Cylinder.B at parallel junction
+5. **Cylinder Position** - Cylinder rod output
+
+All sensors require PS-Simulink Converter blocks for signal conversion.
+
+**C. simlog Extraction Script**
+
+Create `extract_simlog_data.m`:
+```matlab
+function data_struct = extract_simlog_data(simlog, time_index)
+    data_struct = struct();
+    
+    % Pump
+    data_struct.pump.outlet.pressure = simlog.FlowSource.B.p.series.values(time_index);
+    data_struct.pump.outlet.flow = simlog.FlowSource.B.q.series.values(time_index);
+    
+    % Directional Valve (4 ports)
+    data_struct.directional.pump.pressure = simlog.DirectionalValve.P.p.series.values(time_index);
+    data_struct.directional.tank.pressure = simlog.DirectionalValve.T.p.series.values(time_index);
+    data_struct.directional.capEnd.pressure = simlog.DirectionalValve.A.p.series.values(time_index);
+    data_struct.directional.rodEnd.pressure = simlog.DirectionalValve.B.p.series.values(time_index);
+    
+    % Cylinder
+    data_struct.cylinder.capEnd.pressure = simlog.Cylinder.A.p.series.values(time_index);
+    data_struct.cylinder.rodEnd.pressure = simlog.Cylinder.B.p.series.values(time_index);
+    
+    % Relief, Vent, Check, Restriction, Filter, Tank...
+    % (similar pattern for all 20+ ports)
+    
+    data_struct.time = simlog.FlowSource.B.p.series.time(time_index);
+end
+```
+
+**D. UDP Streaming Modes**
+
+1. **Real-Time Mode** (during simulation)
+   - Stream sensor data only (5 points)
+   - 30-60 Hz update rate
+   - Uses UDP Send blocks in Simulink
+
+2. **Batch Mode** (post-simulation)
+   - Stream complete simlog data (20+ points)
+   - 10-30 Hz playback rate
+   - Uses MATLAB UDP socket programming
+
+**Data Packet Format (JSON):**
+```json
+{
+  "timestamp": 1.234,
+  "mode": "realtime" | "batch",
+  "data": {
+    "pump": {"outlet": {"pressure": 21000000, "flow": 0.00005}},
+    "cylinder": {"capEnd": {"pressure": 18000000}, "rodEnd": {"pressure": 2000000}},
+    "directional": {"pump": {"pressure": 20500000}, "capEnd": {"pressure": 18000000}}
+  }
+}
+```
+
+**E. Validation Checklist**
+- [ ] simlog captures all 20+ port states
+- [ ] simlog data extraction script works
+- [ ] 5 strategic sensors added to model
+- [ ] PS-Simulink converters configured
+- [ ] UDP Send blocks added and tested
+- [ ] Real-time streaming achieves 30+ Hz
+- [ ] Batch streaming tested with simlog data
+- [ ] Data format documented
+- [ ] Port-to-visualization mapping created
+- [ ] Cross-validation: simlog vs sensor values match
+- [ ] Latency measured < 20ms
+- [ ] No packet loss over 5+ minute test runs
+
+**References:**
+- [Simscape Data Logging](https://www.mathworks.com/help/simscape/ug/about-simulation-data-logging.html)
+- [Accessing Logged Data](https://www.mathworks.com/help/simscape/ug/accessing-logged-simulation-data.html)
+- [Foundation Library Sensors](https://www.mathworks.com/help/physmod/simscape/ref/sensors.html)
+
 ### Phase 3: Unreal Layout Modeling
 **Objective:** Create 3D representation of hydraulic system in Unreal
 
