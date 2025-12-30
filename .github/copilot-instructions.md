@@ -11,9 +11,12 @@ Always:
 
 This applies to:
 - Creating new files
+- Creating new documentation files
 - Modifying existing files
 - Adding or removing code blocks
 - Changing file structure or organization
+
+**DO NOT generate new documentation files without explicit permission.**
 
 ## Unit Testing Requirement
 
@@ -56,6 +59,12 @@ This applies to:
 5. Wait for approval before executing
 
 Never jump to implementation without these steps.
+
+## Planning & Task Estimation Rule
+
+**NEVER add time estimates (weeks, days, hours) to task planning documents.**
+
+Only specify tasks and objectives. Actual duration will be tracked as work progresses. Time estimates are unreliable and should not constrain the project.
 
 ## Code Quality Standards
 

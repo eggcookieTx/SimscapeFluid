@@ -1,14 +1,16 @@
 # Dependencies
 
 ## MATLAB Toolboxes
-[To be listed as dependencies are determined]
-
-## Python Packages
-[To be listed; create requirements.txt in root when needed]
+- **MATLAB Version**: R2025b
+- **Required Toolboxes**:
+  - Simulink
+  - Simscape
+  - Simscape Fluids
+  - [Additional toolboxes to be listed as needed]
 
 ## Unreal Engine
-- **Version**: [TBD]
-- **Plugins Required**: [TBD]
+- **Version**: 5.7.1
+- **Plugins Required**: [Custom UDP plugin to be developed]
 
 ## Other Dependencies
 [To be added]
