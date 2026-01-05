@@ -12,6 +12,28 @@ This document compiles research findings on integrating MATLAB Simscape Fluid mo
 
 ---
 
+## Unreal POC (Reuse-First, Minimal Build)
+
+- Tooling: Unreal Engine 5.x + Visual Studio 2022 (C++). Setup guide: https://docs.unrealengine.com/5.4/en-US/setting-up-visual-studio-development-environment-for-unreal-engine/
+- Plugin scaffold: Create a C++ plugin via the UE Plugin Wizard (no assets). Reference: https://docs.unrealengine.com/5.4/en-US/creating-plugins-in-unreal-engine/
+- UDP receiver core:
+    - Use FUdpSocketBuilder + FSocket + FIPv4Endpoint for a listener (localhost first). API refs: https://docs.unrealengine.com/5.4/en-US/API/Runtime/Sockets/FUdpSocketBuilder/ and https://docs.unrealengine.com/5.4/en-US/API/Runtime/Networking/Common/Interfaces/FIPv4Endpoint/
+    - Parse compact JSON packets (timestamp + flattened pressures/flows + rod state). Example payload: { t, pressures: [...], flows: [...], rod: { pos, vel } }.
+- Blueprint access: Expose data via a Blueprint Function Library (UFUNCTION(BlueprintCallable)) and events (UPROPERTY(BlueprintAssignable)). Guide: https://docs.unrealengine.com/5.4/en-US/blueprint-function-libraries-in-unreal-engine/
+- Visualization mapping (placeholders only):
+    - Pressure → dynamic material color parameter on meshes.
+    - Flow → Niagara particle spawn rate. Niagara docs: https://docs.unrealengine.com/5.4/en-US/niagara-visual-effects-in-unreal-engine/
+    - Cylinder stroke → actor transform (relative Z).
+- Test loop:
+    1) Run UDP echo on localhost; confirm packets received/logged.
+    2) Feed recorded simlog/MAT playback into the listener; verify materials/particles update.
+    3) Measure frame time and packet drop; adjust rate (start ~10–30 Hz).
+- Reuse policy: No custom assets required for POC—use Engine starter meshes/materials; keep all new content inside the plugin folder.
+ - Reuse policy: No custom assets required for POC—use Engine starter meshes/materials; keep all new content inside the plugin folder.
+
+For initial POC, use offline MAT playback: export simulation results to JSON (see scripts/matlab/export_simlog_for_unreal.m), ingest in Unreal, and drive visuals without live UDP.
+---
+
 ## 1. Simscape Fluids Overview
 
 ### 1.1 Product Definition

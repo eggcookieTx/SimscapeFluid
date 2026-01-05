@@ -4,6 +4,113 @@ This document is designed for LLM context. It can be detailed and verbose to pro
 
 ## Session History
 
+### Current Focus (Unreal POC) — Research + Task Stack
+
+**Note (Dec 31, 2025):** Unreal planning docs were removed at user request. Any new Unreal guidance will be recreated only after explicit approval.
+
+**Research to confirm:**
+- Target engine/toolchain (UE 5.x + VS2022) for a C++ project with UDP support
+- Asset approach: placeholder meshes vs. sourced models
+- UDP port/packet/update rate for POC (e.g., port 5004, JSON, ~10–30 Hz)
+- Performance goals for POC: visual fidelity vs. ≥60 FPS, acceptable latency/loss thresholds
+- MATLAB streaming script (udp_stream_simlog.m) to be created after POC validation (Phase 2C deferred)
+
+**Immediate tasks to execute (Phases 3 & 4):**
+1) Task 1: Create Unreal C++ project and plugin skeleton; ensure plugin appears in Editor
+2) Task 2: Build component blueprints/materials; place 10 components per P&ID layout
+3) Task 3: Route 12 pipes with spline meshes and pressure-driven materials
+4) Task 4: Implement UDP plugin core (listener, JSON parsing, Blueprint accessors)
+5) Task 5: Bind Blueprint controller to UDP events and log received data
+6) Task 6: Wire visualization updates (pressure colors, flow particles, cylinder rod motion)
+7) Task 7: Integration test with MAT-file playback via UDP; check FPS/latency/loss
+8) Task 8: Polish (HUD, counters, packaged build) and capture learnings
+
+### Jan 1, 2026 - Unreal POC Integration Progress
+
+**Actions Completed:**
+- Integrated the flopperam/unreal-engine-mcp plugin into `Plugins/UnrealMCP` and removed a nested duplicate copy that caused duplicate module definitions.
+- Updated `SimpleHydraulics.uproject` to enable the plugin and rebuilt `SimpleHydraulicsEditor` (Win64, Development); editor plugin module produced.
+- Installed Python dependency `mcp` for the plugin Python server and started `unreal_mcp_server_advanced.py` (stdio transport). Server writes `unreal_mcp_advanced.log`.
+- Created and executed `Plugins/UnrealMCP/Python/test_client_stdio.py`. The test client initialized a stdio session and listed available tools (including `get_actors_in_level`, `find_actors_by_name`, `set_actor_transform`, `apply_material_to_actor`).
+- Confirmed offline playback JSON at `c:/0Work/Projects/LLM-MCP/SimscapeFluid/data/processed/unreal_playback.json` (~15.7 MB) produced by the MATLAB exporter.
+
+**Notes / Observations:**
+- The server exposes many control tools — use `find_actors_by_name` / `set_actor_transform` and material tools for initial tests.
+- Avoid streaming the full JSON until mapping from JSON fields → UE actor properties is validated with a small-frame test.
+
+**Next Immediate Tasks (short-term):**
+1. Define JSON→UE mapping (pressure indices → material parameters; flow → Niagara spawn rate; rod.vel → cylinder transform).
+2. Confirm target actor names in the Unreal level (or add an `APlaybackManager`) so the playback client can target them.
+3. Implement a minimal playback client `Plugins/UnrealMCP/Python/playback_client.py` that reads one frame and issues a single safe `set_actor_transform` test call; include a unit test to mock MCP session.
+4. Validate update in Editor (PIE) on a small subset, then extend to batched/frame streaming with timing control.
+
+### December 31, 2025 - Phase Priority Reordering
+
+**Decision Made:**
+- ✅ **Reorder Phase Execution**
+  - Previous: Phase 2C (UDP) → Phase 3 (Layout) → Phase 4 (Visualization)
+  - New: Phase 3 & 4 (Unreal POC) → Phase 2C (UDP finalization)
+  - Rationale: Build visualization first to verify POC works, then finalize UDP
+  
+**New Priority:**
+1. **Phase 3 & 4 (IMMEDIATE)**: Unreal side development
+   - Design 3D layout matching SimpleHydraulicSchematics.jpg
+   - Build basic Unreal level with component placeholders
+   - Create C++ UDP receiver plugin
+   - Implement pressure/flow visualization
+   - **Goal**: Proof of concept showing complete hydraulic network state visualization
+
+2. **Phase 2C (DEFERRED)**: UDP streaming finalization
+   - Will implement after Unreal visualization is working
+   - Define final packet format based on Unreal requirements
+   - Optimize data transmission
+
+### December 31, 2025 - Phase 2C Planning
+
+**Decisions Made:**
+- ✅ **Phase 2B SKIPPED**: Real-time sensor addition
+  - Rationale: simlog captures all 20+ port states automatically
+  - Physical sensor placement would be redundant
+  - simlog data is more comprehensive than discrete sensors
+  - Cost-benefit: Skip sensor modeling, focus on visualization
+
+**Previous Planning:**
+- Phase 2C: UDP streaming of simlog data to Unreal
+- Next Tasks:
+  1. Create `udp_stream_simlog.m` - load MAT file and stream data via UDP
+  2. JSON packet format for 20+ port states
+  3. UDP transmission at 10-30 Hz (streaming historical data playback)
+  4. Prepare for Unreal UDP receiver plugin
+  5. Start Phase 3: Unreal receiver and visualization
+
+### December 31, 2025 - Phase 2 Part A Complete
+
+**Completed:**
+- ✅ **PHASE 2A COMPLETE**: Simscape Data Logging
+  - Created `run_and_log_simulation.m` script for comprehensive simlog data extraction
+  - Implemented critical fix: Use `Simulink.SimulationInput` object for proper SimulationOutput return
+  - Discovered and resolved simlog data access issues:
+    * Used `.series.values('unit')` method for accessing pressure/flow data
+    * Used try-catch instead of isfield() for simscape.logging.Node objects
+    * Properly handled component-specific structures (e.g., Cylinder uses chamber_A.mdot_A instead of q_A)
+  - Script now successfully extracts 20+ port states:
+    * FlowSource: pressure, flow (B port)
+    * ReliefValve: pressures (A, B ports), flow
+    * VentValve: pressures, flow
+    * DirectionalValve: all 4 ports (P, T, A, B) with pressure and flow
+    * CheckValve: pressures, flow
+    * FlowRestriction: pressures, flow
+    * Filter: pressures, flow
+    * Cylinder: cap-end/rod-end pressures, mass flows, rod velocity
+    * Tanks: inlet pressure, flow
+  - Data files: 2-3 MB per run (31,671 time points over 30 seconds)
+  - Updated ERROR_LOG.md with comprehensive resolution details
+- ✅ Documented critical API discoveries in ERROR_LOG.md for future reference
+
+**Next Phase:**
+- Phase 2B: Add 5 strategic real-time sensors to model for UDP streaming
+- Phase 2C: Implement UDP data transmission
+
 ### December 30, 2025 - Extended Session
 
 **Completed:**

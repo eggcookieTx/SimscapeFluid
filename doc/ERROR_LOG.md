@@ -41,5 +41,50 @@ Track general errors encountered due to LLM knowledge limitations from training 
 - **Status**: ✅ Resolved
 - **Prevention**: Always discover port names before connecting new block types
 
+### 2025-12-31: sim() Returns Empty SimulationOutput - Missing simlog Data
+- **Date**: 2025-12-31
+- **Error Type**: API Misuse / Incorrect Configuration
+- **Context**: Programmatic simulation using `sim(modelName)` for Simscape data logging
+- **Message**: `sim()` returned only `SimulationMetadata` and `ErrorMessage` fields, no `simlog` field containing Simscape logging data
+- **Symptoms**:
+  - `simOut = sim(modelName)` completed successfully
+  - `fieldnames(simOut)` showed only: `SimulationMetadata`, `ErrorMessage`
+  - Expected fields missing: `simlog`, `yout`, `tout`, `xout`
+  - Model runs successfully manually in Simulink GUI
+  - Model already configured with `SimscapeLogType='all'` and `ReturnWorkspaceOutputs='on'`
+- **Root Cause**: Using basic `sim(modelName)` syntax does not guarantee `Simulink.SimulationOutput` object return format. The model may have been created before R2019a or had legacy configuration
+- **Resolution**: 
+  1. **Primary Fix**: Use `Simulink.SimulationInput` object to force proper output format:
+     ```matlab
+     simIn = Simulink.SimulationInput(modelName);
+     simOut = sim(simIn);
+     ```
+     This guarantees `sim()` returns `Simulink.SimulationOutput` object with all data fields
+  2. **Data Access Fix**: Simscape logging data requires proper access methods:
+     - Pressure: `simlog.BlockName.Port.p.series.values('Pa')` (must specify units)
+     - Flow: `simlog.BlockName.q_Port.series.values('m^3/s')` (not `Port.q`)
+  3. **Object Handling Fix**: `simscape.logging.Node` objects don't work with `isfield()`
+     - Use `try-catch` blocks instead of `isfield()` checks
+     - Or use `isprop()` instead of `isfield()`
+- **Failed Attempts**:
+  - Passing `'ReturnWorkspaceOutputs', 'on'` to `sim()` - insufficient
+  - Using `set_param()` before simulation - doesn't affect sim() return type
+  - Checking model parameters (they were already correct)
+- **Reference**: 
+  - https://www.mathworks.com/help/simulink/slref/sim.html
+  - https://www.mathworks.com/help/simulink/gui/singlesimulationoutput.html
+  - https://www.mathworks.com/help/simulink/slref/simulink.simulationoutput.html
+- **Additional Discovery**: 
+  - Cylinder blocks have different structure than valves:
+    - Valves: `ValveName.Port.p` and `ValveName.q_Port`
+    - Cylinder: `Cylinder.Port.p` but mass flow in `Cylinder.chamber_A.mdot_A` 
+    - Cylinder velocity: `Cylinder.R.v` (rod port)
+- **Status**: ✅ Resolved
+- **Prevention**: 
+  - Always use `Simulink.SimulationInput` for programmatic simulations
+  - Always call `.values('unit')` with explicit units when extracting simlog data
+  - Use try-catch for simscape.logging.Node property access
+  - Test data extraction immediately after simulation, not after saving/loading MAT file
+
 ## Recurring Issues
 [Issues that need investigation or systematic fix]
