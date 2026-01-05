@@ -1,5 +1,5 @@
 {
-  "comment": "Hydraulic system topology matching SimpleHydraulicSchematics.jpg P&ID",
+  "comment": "Hydraulic system topology matching SimpleHydraulicSchematics.jpg P&ID - PIPE-FOCUSED VISUALIZATION",
   "unreal_scale": {
     "description": "Unreal units (cm). Layout designed for ~2000x1500 cm workspace",
     "unit": "cm"
@@ -12,7 +12,6 @@
       "position": {"x": 0, "y": 800, "z": 0},
       "mesh": "Cube",
       "scale": {"x": 1.5, "y": 1.5, "z": 2.0},
-      "data_index": 0,
       "ports": {
         "A": "inlet",
         "B": "outlet",
@@ -26,7 +25,6 @@
       "position": {"x": 0, "y": 0, "z": 0},
       "mesh": "Cube",
       "scale": {"x": 2.0, "y": 2.0, "z": 1.5},
-      "data_index": null,
       "ports": {
         "A": "inlet"
       }
@@ -38,7 +36,6 @@
       "position": {"x": -600, "y": 500, "z": 0},
       "mesh": "Cube",
       "scale": {"x": 1.0, "y": 1.0, "z": 1.5},
-      "data_index": 1,
       "ports": {
         "A": "inlet",
         "B": "return"
@@ -51,7 +48,6 @@
       "position": {"x": 0, "y": 500, "z": 0},
       "mesh": "Cube",
       "scale": {"x": 1.0, "y": 1.0, "z": 1.5},
-      "data_index": 2,
       "ports": {
         "A": "inlet",
         "B": "outlet"
@@ -64,7 +60,6 @@
       "position": {"x": 600, "y": 500, "z": 0},
       "mesh": "Cube",
       "scale": {"x": 1.5, "y": 1.0, "z": 1.5},
-      "data_index": 3,
       "ports": {
         "P": "pump_inlet",
         "T": "tank_return",
@@ -80,7 +75,6 @@
       "position": {"x": 600, "y": 1200, "z": 0},
       "mesh": "Cylinder",
       "scale": {"x": 1.5, "y": 1.5, "z": 3.0},
-      "data_index": 4,
       "ports": {
         "A": "cap_end",
         "B": "rod_end"
@@ -98,7 +92,6 @@
       "position": {"x": 800, "y": 900, "z": 0},
       "mesh": "Cube",
       "scale": {"x": 0.8, "y": 0.8, "z": 1.0},
-      "data_index": 5,
       "ports": {
         "A": "inlet",
         "B": "outlet"
@@ -111,7 +104,6 @@
       "position": {"x": 400, "y": 900, "z": 0},
       "mesh": "Cube",
       "scale": {"x": 0.8, "y": 0.8, "z": 1.0},
-      "data_index": 6,
       "ports": {
         "A": "inlet",
         "B": "outlet"
@@ -124,7 +116,6 @@
       "position": {"x": 600, "y": 200, "z": 0},
       "mesh": "Cube",
       "scale": {"x": 1.2, "y": 1.2, "z": 1.8},
-      "data_index": 7,
       "ports": {
         "A": "inlet",
         "B": "outlet"
@@ -134,7 +125,7 @@
   "connections": [
     {
       "id": "pipe_01",
-      "name": "Pump to Relief Valve",
+      "name": "Main Pressure: Pump → Relief Valve (Manifold Branch)",
       "from": {"component": "FlowSource", "port": "B"},
       "to": {"component": "ReliefValve", "port": "A"},
       "waypoints": [
@@ -143,11 +134,13 @@
         {"x": -600, "y": 650, "z": 0},
         {"x": -600, "y": 500, "z": 0}
       ],
-      "flow_data_index": 0
+      "pressure_index": 0,
+      "flow_index": 1,
+      "note": "Part of main manifold - pressure[0]=pressure[1]=pressure[3]=pressure[5]"
     },
     {
       "id": "pipe_02",
-      "name": "Relief Valve to Tank",
+      "name": "Relief Return: Relief Valve → Tank",
       "from": {"component": "ReliefValve", "port": "B"},
       "to": {"component": "Tank", "port": "A"},
       "waypoints": [
@@ -156,11 +149,13 @@
         {"x": -300, "y": 0, "z": 0},
         {"x": 0, "y": 0, "z": 0}
       ],
-      "flow_data_index": 1
+      "pressure_index": 2,
+      "flow_index": 1,
+      "note": "Relief outlet pressure"
     },
     {
       "id": "pipe_03",
-      "name": "Pump to Vent Valve",
+      "name": "Main Pressure: Pump → Vent Valve (Manifold Branch)",
       "from": {"component": "FlowSource", "port": "B"},
       "to": {"component": "VentValve", "port": "A"},
       "waypoints": [
@@ -168,11 +163,13 @@
         {"x": 0, "y": 650, "z": 0},
         {"x": 0, "y": 500, "z": 0}
       ],
-      "flow_data_index": 2
+      "pressure_index": 0,
+      "flow_index": 2,
+      "note": "Part of main manifold - shares pressure with pipe_01, pipe_05"
     },
     {
       "id": "pipe_04",
-      "name": "Vent Valve to Tank",
+      "name": "Vent Return: Vent Valve → Tank",
       "from": {"component": "VentValve", "port": "B"},
       "to": {"component": "Tank", "port": "A"},
       "waypoints": [
@@ -180,11 +177,13 @@
         {"x": 0, "y": 200, "z": 0},
         {"x": 0, "y": 0, "z": 0}
       ],
-      "flow_data_index": 3
+      "pressure_index": 4,
+      "flow_index": 2,
+      "note": "Vent outlet pressure"
     },
     {
       "id": "pipe_05",
-      "name": "Pump to Directional Valve",
+      "name": "Main Pressure: Pump → Directional Valve (Manifold Branch)",
       "from": {"component": "FlowSource", "port": "B"},
       "to": {"component": "DirectionalValve", "port": "P"},
       "waypoints": [
@@ -193,11 +192,13 @@
         {"x": 600, "y": 650, "z": 0},
         {"x": 600, "y": 500, "z": 0}
       ],
-      "flow_data_index": 4
+      "pressure_index": 5,
+      "flow_index": 3,
+      "note": "Part of main manifold - primary supply line to actuator circuit"
     },
     {
       "id": "pipe_06",
-      "name": "Directional Valve to Cylinder Cap-End",
+      "name": "Cylinder Cap Line: Dir.A → Cyl.A",
       "from": {"component": "DirectionalValve", "port": "A"},
       "to": {"component": "Cylinder", "port": "A"},
       "waypoints": [
@@ -205,11 +206,13 @@
         {"x": 600, "y": 850, "z": 0},
         {"x": 600, "y": 1200, "z": 0}
       ],
-      "flow_data_index": 5
+      "pressure_index": 7,
+      "flow_index": 5,
+      "note": "Extension line - pressure[7]=pressure[9] (dir.A=cyl.A)"
     },
     {
       "id": "pipe_07",
-      "name": "Cylinder Rod-End to Flow Restriction",
+      "name": "Cylinder Rod Line: Cyl.B → Flow Restriction",
       "from": {"component": "Cylinder", "port": "B"},
       "to": {"component": "FlowRestriction", "port": "A"},
       "waypoints": [
@@ -217,11 +220,13 @@
         {"x": 700, "y": 1100, "z": 0},
         {"x": 800, "y": 900, "z": 0}
       ],
-      "flow_data_index": 6
+      "pressure_index": 10,
+      "flow_index": 8,
+      "note": "Retraction line - pressure[10]=pressure[13] (cyl.B=restrict.A)"
     },
     {
       "id": "pipe_08",
-      "name": "Flow Restriction to Directional Valve Rod-End",
+      "name": "Flow Restriction Return: Restrict → Dir.B",
       "from": {"component": "FlowRestriction", "port": "B"},
       "to": {"component": "DirectionalValve", "port": "B"},
       "waypoints": [
@@ -230,11 +235,13 @@
         {"x": 700, "y": 500, "z": 0},
         {"x": 600, "y": 500, "z": 0}
       ],
-      "flow_data_index": 7
+      "pressure_index": 14,
+      "flow_index": 8,
+      "note": "Connects restriction outlet to dir.B - pressure[14]=pressure[8]"
     },
     {
       "id": "pipe_09",
-      "name": "Directional Valve to Check Valve (Parallel)",
+      "name": "Check Valve Supply: Dir.B → Check.A (Parallel Path)",
       "from": {"component": "DirectionalValve", "port": "B"},
       "to": {"component": "CheckValve", "port": "A"},
       "waypoints": [
@@ -242,11 +249,13 @@
         {"x": 500, "y": 700, "z": 0},
         {"x": 400, "y": 900, "z": 0}
       ],
-      "flow_data_index": 8
+      "pressure_index": 8,
+      "flow_index": 7,
+      "note": "Parallel supply path - pressure[8]=pressure[11] (dir.B=check.A)"
     },
     {
       "id": "pipe_10",
-      "name": "Check Valve to Cylinder Rod-End (Parallel)",
+      "name": "Check Valve Return: Check.B → Cyl.B (Parallel Path)",
       "from": {"component": "CheckValve", "port": "B"},
       "to": {"component": "Cylinder", "port": "B"},
       "waypoints": [
@@ -254,11 +263,13 @@
         {"x": 500, "y": 1100, "z": 0},
         {"x": 600, "y": 1200, "z": 0}
       ],
-      "flow_data_index": 9
+      "pressure_index": 12,
+      "flow_index": 7,
+      "note": "Parallel return path - pressure[12]=pressure[10] (check.B=cyl.B)"
     },
     {
       "id": "pipe_11",
-      "name": "Directional Valve to Filter",
+      "name": "Tank Return Main: Dir.T → Filter",
       "from": {"component": "DirectionalValve", "port": "T"},
       "to": {"component": "Filter", "port": "A"},
       "waypoints": [
@@ -266,11 +277,13 @@
         {"x": 600, "y": 350, "z": 0},
         {"x": 600, "y": 200, "z": 0}
       ],
-      "flow_data_index": 10
+      "pressure_index": 6,
+      "flow_index": 4,
+      "note": "Main return line - pressure[6]=pressure[15] (dir.T=filter.A)"
     },
     {
       "id": "pipe_12",
-      "name": "Filter to Tank",
+      "name": "Filter Return: Filter → Tank",
       "from": {"component": "Filter", "port": "B"},
       "to": {"component": "Tank", "port": "A"},
       "waypoints": [
@@ -278,43 +291,56 @@
         {"x": 300, "y": 100, "z": 0},
         {"x": 0, "y": 0, "z": 0}
       ],
-      "flow_data_index": 11
+      "pressure_index": 16,
+      "flow_index": 9,
+      "note": "Final return to tank - pressure[16]=pressure[17] (filter.B=tank.A)"
     }
   ],
   "data_mapping": {
-    "comment": "Maps JSON array indices to components",
+    "comment": "Maps Frame.Pressure and Frame.Flow array indices to physical measurements",
     "pressure_indices": {
-      "0": "FlowSource port B",
-      "1": "ReliefValve port A",
-      "2": "ReliefValve port B",
-      "3": "VentValve port A",
-      "4": "VentValve port B",
-      "5": "DirectionalValve port P",
-      "6": "DirectionalValve port T",
-      "7": "DirectionalValve port A",
-      "8": "DirectionalValve port B",
-      "9": "Cylinder chamber A",
-      "10": "Cylinder chamber B",
-      "11": "FlowRestriction port A",
-      "12": "FlowRestriction port B",
-      "13": "CheckValve port A",
-      "14": "CheckValve port B",
-      "15": "Filter port A",
-      "16": "Filter port B",
-      "17": "Tank port A"
+      "0": "FlowSource.B (pump outlet) - MAIN MANIFOLD",
+      "1": "ReliefValve.A (inlet) - same as pressure[0]",
+      "2": "ReliefValve.B (outlet/return)",
+      "3": "VentValve.A (inlet) - same as pressure[0]",
+      "4": "VentValve.B (outlet/return)",
+      "5": "DirectionalValve.P (pump port) - same as pressure[0]",
+      "6": "DirectionalValve.T (tank return port)",
+      "7": "DirectionalValve.A (cap-end port) - same as pressure[9]",
+      "8": "DirectionalValve.B (rod-end port) - same as pressure[10]",
+      "9": "Cylinder.A (cap-end chamber) - same as pressure[7]",
+      "10": "Cylinder.B (rod-end chamber) - same as pressure[8]",
+      "11": "CheckValve.A (inlet) - same as pressure[8]",
+      "12": "CheckValve.B (outlet) - same as pressure[10]",
+      "13": "FlowRestriction.A (inlet) - same as pressure[10]",
+      "14": "FlowRestriction.B (outlet)",
+      "15": "Filter.A (inlet) - same as pressure[6]",
+      "16": "Filter.B (outlet) - same as pressure[17]",
+      "17": "Tank.A (inlet) - same as pressure[16]"
     },
     "flow_indices": {
-      "0": "ReliefValve flow",
-      "1": "VentValve flow",
-      "2": "DirectionalValve P flow",
-      "3": "DirectionalValve T flow",
-      "4": "DirectionalValve A flow",
-      "5": "DirectionalValve B flow",
-      "6": "Cylinder chamber A flow",
-      "7": "FlowRestriction flow",
-      "8": "CheckValve flow",
-      "9": "Filter flow",
-      "10": "Tank inlet flow"
+      "0": "FlowSource.B (pump outlet flow)",
+      "1": "ReliefValve.A (relief flow)",
+      "2": "VentValve.A (vent flow)",
+      "3": "DirectionalValve.P (pump port flow)",
+      "4": "DirectionalValve.T (tank return flow)",
+      "5": "DirectionalValve.A (cap-end flow)",
+      "6": "DirectionalValve.B (rod-end flow)",
+      "7": "CheckValve.A (check valve flow)",
+      "8": "FlowRestriction.A (restriction flow)",
+      "9": "Filter.A (filter flow)",
+      "10": "Tank.A (tank inlet flow)"
+    },
+    "rod_data": {
+      "velocity": "Frame.rod.vel (m/s) - integrate for position"
     }
+  },
+  "visualization_notes": {
+    "pipe_pressure": "Use pressure_index from connections, map to blue→red gradient (0-224 kPa range)",
+    "pipe_flow": "Use flow_index from connections, map to line thickness and particle speed",
+    "components": "Simple labeled nodes - no pressure visualization on components",
+    "manifold_handling": "Pipes 01, 03, 05 share same pressure (main manifold) - render as connected branches",
+    "flow_direction": "Positive flow = from→to, negative flow = to→from (particle direction)",
+    "cylinder_animation": "Integrate rod.vel over time to get rod position, animate Z-offset"
   }
 }
