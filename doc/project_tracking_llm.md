@@ -4,6 +4,114 @@ This document is designed for LLM context. It can be detailed and verbose to pro
 
 ## Session History
 
+### Jan 5, 2026 - Pressure Visualization Complete + Topology Planning
+
+**Major Milestone Achieved: Playback with Dynamic Material Visualization Working**
+
+**Actions Completed:**
+
+1. **Material System Implementation:**
+   - Created Python automation script `create_material_simple.py` (76 lines) using Unreal's MaterialEditingLibrary API
+   - Material graph: ScalarParameter "Pressure" (0-1) → LinearInterpolate (blue to red) → BaseColor + EmissiveColor
+   - Script executed successfully in Unreal Editor Python console, created `/Game/Materials/M_Pressure`
+   - Material assigned to PlaybackManager's "Pressure Material" property
+
+2. **C++ Visualization Enhancements:**
+   - Updated PlaybackManager.h: Added UMaterialInterface* PressureMaterial, UStaticMesh* PumpMesh/CylinderMesh, TArray<UMaterialInstanceDynamic*> DynamicMaterials
+   - Updated PlaybackManager.cpp constructor: Load Engine/BasicShapes meshes (Cube, Cylinder) via ConstructorHelpers
+   - Enhanced SpawnPlaceholderActors(): Assign meshes, set scales (pumps 1x1x2, cylinders 1.5x1.5x3), create MaterialInstanceDynamic from PressureMaterial
+   - Enhanced UpdateActorStates(): Set scalar parameter "Pressure" on dynamic materials each frame
+   - Added detailed logging: Every 100 frames logs pressure, normalized value, Z position, material validity
+
+3. **Critical Bug Fixes:**
+   - **Crash on Second PIE Run**: Added cleanup logic in SpawnPlaceholderActors() to find and destroy existing actors by name before spawning (lines 210-220)
+   - **Mobility Warnings**: Set EComponentMobility::Movable on spawned StaticMeshComponents to allow runtime animation
+   - Both issues resolved, multiple PIE cycles tested successfully
+
+4. **Data Analysis & Normalization Fix:**
+   - Analyzed unreal_playback.json: Pressure range 0-224,082 Pa (0-0.224 MPa), not 0-10 MPa as initially assumed
+   - Updated normalization in UpdateActorStates(): Changed divisor from 10,000,000 to 224,000 for correct 0-1 mapping
+   - Result: Colors now properly animate blue (low pressure) → purple → red (high pressure) instead of staying all blue
+
+5. **File Organization:**
+   - Copied unreal_playback.json (15.7 MB, 31,671 frames) to Unreal project: `Content/Data/unreal_playback.json`
+   - Created MATERIAL_SETUP_GUIDE.md (150+ lines) with step-by-step manual material creation instructions
+   - Created test_playback_mcp.py for MCP server connectivity testing (discovered MCP doesn't support material creation)
+
+**Testing Results:**
+- ✅ PlaybackManager loads 31,671 frames successfully
+- ✅ Spawns 11 actors: 6 pumps (cubes), 1 cylinder, 4 pipe splines
+- ✅ No crash on PIE → Stop → Play cycle
+- ✅ No mobility warnings
+- ✅ Actors visible with proper meshes
+- ✅ Colors animate dynamically based on pressure data
+- ✅ Z-position animation working (50 + normalized_pressure * 200)
+- ✅ Materials update correctly (verified via log: "Material=Valid")
+- ✅ Frame updates logged every 100 frames with detailed diagnostics
+
+**Git Commits:**
+- Commit `afc6079`: "Implement Unreal Engine PlaybackManager and MCP integration" (Jan 5, earlier)
+- Commit `98dfbe9`: "Complete pressure visualization: dynamic materials, correct normalization, color animation working" (Jan 5, latest)
+
+**Current State:**
+- Basic POC fully functional: 31,671-frame playback with pressure-driven color visualization
+- Actors spawning in simple grid layout (200 unit X spacing) - **NOT matching P&ID topology yet**
+- Material system working perfectly with correct data range
+- Ready for topology implementation
+
+**Identified Gap:**
+- **Missing**: Proper P&ID topology layout
+- **Current**: Actors spawn in random grid positions
+- **Needed**: Match 3D layout to SimpleHydraulicSchematics.jpg with proper pipe routing
+
+**Next Task - Topology Implementation (Options 1 + 3):**
+
+**Option 1: Manual Topology JSON**
+- Create `topology.json` defining:
+  - Component 3D positions matching P&ID layout
+  - Pipe connection graph (from/to components)
+  - Spline waypoints for pipe routing
+- Extract connection data from Simscape model's 12 addConnection() calls
+- Map 2D Simulink block positions to 3D Unreal coordinates
+
+**Option 3: MCP Scene Builder**
+- Create Python script using Unreal MCP server
+- Read topology.json and programmatically build scene:
+  - Spawn actors at correct positions via set_actor_transform
+  - Create spline actors for pipe connections
+  - Apply materials and meshes via apply_material_to_actor
+- Advantage: Reproducible, version-controlled scene setup
+
+**Integration Plan:**
+1. Create topology.json with component positions and connections
+2. Write MCP scene builder script to construct layout
+3. Update PlaybackManager to read positions from JSON (instead of grid)
+4. Implement spline mesh creation between connected components
+5. Test playback with proper topology showing hydraulic flow paths
+
+**Files Modified (Jan 5 session):**
+- `UnrealProject/SimpleHydraulics/Source/SimpleHydraulics/PlaybackManager.h` - Added visualization properties
+- `UnrealProject/SimpleHydraulics/Source/SimpleHydraulics/PlaybackManager.cpp` - Material support, mesh loading, normalization fix, logging
+- `doc/project_tracking_human.md` - Progress updates, topology task added
+- `doc/MATERIAL_SETUP_GUIDE.md` - New file, manual material creation guide
+- `scripts/python/create_material_simple.py` - Automated material creation
+- `scripts/python/test_playback_mcp.py` - MCP connectivity test
+
+**Key Technical Learnings:**
+- Unreal Python API required for material graph creation (MCP plugin doesn't support it)
+- MaterialEditingLibrary can create complete material graphs programmatically
+- Pressure normalization critical for visual feedback - must match actual data range
+- Dynamic materials work well for real-time parameter updates
+- Engine BasicShapes meshes sufficient for POC (no need for custom models yet)
+
+**Performance Notes:**
+- 31,671 frames load in ~1 second
+- Playback runs smoothly (no FPS data yet, visual observation only)
+- Material updates per frame: 7 actors × SetScalarParameterValue = minimal overhead
+- No noticeable lag or frame drops during playback
+
+---
+
 ### Current Focus (Unreal POC) — Research + Task Stack
 
 **Note (Dec 31, 2025):** Unreal planning docs were removed at user request. Any new Unreal guidance will be recreated only after explicit approval.

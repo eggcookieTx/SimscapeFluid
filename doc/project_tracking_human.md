@@ -78,15 +78,45 @@ Steps:
 
 **Result:** 6 cubes (pumps) + 1 cylinder now visible, colors animate blue→purple→red based on pressure data
 
+---
+
+**[IN PROGRESS] Implement Proper P&ID Topology Layout**
+
+Goal: Replace random grid layout with actual hydraulic schematic topology
+
+Current State:
+- Actors spawn in simple grid (200 unit X spacing)
+- No visual representation of pipe connections
+- Layout doesn't match P&ID schematic
+
+Plan (Options 1 + 3):
+1. **Create topology.json**: Define component 3D positions and connections matching P&ID
+   - Extract connection graph from Simscape model (12 pipe connections)
+   - Map to 3D coordinates matching hydraulic flow paths
+   - Include spline waypoints for pipe routing
+2. **MCP Scene Builder Script**: Programmatically build scene via Unreal MCP
+   - Read topology.json and spawn actors at correct positions
+   - Create spline actors for pipe connections with proper routing
+   - Apply materials and meshes matching component types
+3. **Update PlaybackManager**: Read topology data for spawning
+   - Load positions from JSON instead of grid calculation
+   - Spawn spline meshes between connected components
+   - Maintain data-driven animation (pressure, flow, rod velocity)
+
 ## Immediate Next Steps
 
 1. ✓ Open the Editor, place `APlaybackManager` in the level, configure `DataFilePath`, and test playback
 2. ✓ Assign static meshes (cubes/cylinders from Engine BasicShapes) to spawned actors for visual feedback
 3. ✓ Create dynamic material `M_Pressure` with scalar parameter and assign to actors; map pressure to color
-4. **[NEXT]** Add flow visualization using Niagara particle systems (map flow data to spawn rate)
-5. **[NEXT]** Implement cylinder rod extension/retraction based on `rod.vel` integration
-6. **[NEXT]** Add UI overlay (UMG widget) displaying real-time pressure/flow values
-7. Validate full playback at 30 Hz with all 31,671 frames and confirm stable frame rate
+4. **[NEXT]** Implement proper P&ID topology layout (currently actors spawn in simple grid):
+   - **Approach 1**: Create `topology.json` with actual component positions and pipe connections from P&ID
+   - **Approach 3**: Use MCP Python script to programmatically build scene with proper layout
+   - Update PlaybackManager to read topology and spawn splines between connected components
+   - Match 3D layout to P&ID schematic (see `SimpleHydraulicSchematics.jpg`)
+5. **[FUTURE]** Add flow visualization using Niagara particle systems (map flow data to spawn rate)
+6. **[FUTURE]** Implement cylinder rod extension/retraction based on `rod.vel` integration
+7. **[FUTURE]** Add UI overlay (UMG widget) displaying real-time pressure/flow values
+8. Validate full playback at 30 Hz with all 31,671 frames and confirm stable frame rate
 
 ## Implementation Plan
 

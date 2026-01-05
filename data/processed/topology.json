@@ -1,0 +1,320 @@
+{
+  "comment": "Hydraulic system topology matching SimpleHydraulicSchematics.jpg P&ID",
+  "unreal_scale": {
+    "description": "Unreal units (cm). Layout designed for ~2000x1500 cm workspace",
+    "unit": "cm"
+  },
+  "components": [
+    {
+      "id": "FlowSource",
+      "type": "pump",
+      "name": "Flow Source (Pump)",
+      "position": {"x": 0, "y": 800, "z": 0},
+      "mesh": "Cube",
+      "scale": {"x": 1.5, "y": 1.5, "z": 2.0},
+      "data_index": 0,
+      "ports": {
+        "A": "inlet",
+        "B": "outlet",
+        "M": "manual_control"
+      }
+    },
+    {
+      "id": "Tank",
+      "type": "reservoir",
+      "name": "Tank",
+      "position": {"x": 0, "y": 0, "z": 0},
+      "mesh": "Cube",
+      "scale": {"x": 2.0, "y": 2.0, "z": 1.5},
+      "data_index": null,
+      "ports": {
+        "A": "inlet"
+      }
+    },
+    {
+      "id": "ReliefValve",
+      "type": "valve",
+      "name": "Relief Valve",
+      "position": {"x": -600, "y": 500, "z": 0},
+      "mesh": "Cube",
+      "scale": {"x": 1.0, "y": 1.0, "z": 1.5},
+      "data_index": 1,
+      "ports": {
+        "A": "inlet",
+        "B": "return"
+      }
+    },
+    {
+      "id": "VentValve",
+      "type": "valve",
+      "name": "Vent Valve (2-Way)",
+      "position": {"x": 0, "y": 500, "z": 0},
+      "mesh": "Cube",
+      "scale": {"x": 1.0, "y": 1.0, "z": 1.5},
+      "data_index": 2,
+      "ports": {
+        "A": "inlet",
+        "B": "outlet"
+      }
+    },
+    {
+      "id": "DirectionalValve",
+      "type": "valve",
+      "name": "Directional Valve (4-Way 3-Position)",
+      "position": {"x": 600, "y": 500, "z": 0},
+      "mesh": "Cube",
+      "scale": {"x": 1.5, "y": 1.0, "z": 1.5},
+      "data_index": 3,
+      "ports": {
+        "P": "pump_inlet",
+        "T": "tank_return",
+        "A": "cap_end",
+        "B": "rod_end",
+        "S": "solenoid_control"
+      }
+    },
+    {
+      "id": "Cylinder",
+      "type": "actuator",
+      "name": "Hydraulic Cylinder",
+      "position": {"x": 600, "y": 1200, "z": 0},
+      "mesh": "Cylinder",
+      "scale": {"x": 1.5, "y": 1.5, "z": 3.0},
+      "data_index": 4,
+      "ports": {
+        "A": "cap_end",
+        "B": "rod_end"
+      },
+      "rod_data": {
+        "velocity_index": "rod.vel",
+        "length": 100,
+        "extends_along_axis": "Z"
+      }
+    },
+    {
+      "id": "FlowRestriction",
+      "type": "valve",
+      "name": "Flow Restriction",
+      "position": {"x": 800, "y": 900, "z": 0},
+      "mesh": "Cube",
+      "scale": {"x": 0.8, "y": 0.8, "z": 1.0},
+      "data_index": 5,
+      "ports": {
+        "A": "inlet",
+        "B": "outlet"
+      }
+    },
+    {
+      "id": "CheckValve",
+      "type": "valve",
+      "name": "Check Valve",
+      "position": {"x": 400, "y": 900, "z": 0},
+      "mesh": "Cube",
+      "scale": {"x": 0.8, "y": 0.8, "z": 1.0},
+      "data_index": 6,
+      "ports": {
+        "A": "inlet",
+        "B": "outlet"
+      }
+    },
+    {
+      "id": "Filter",
+      "type": "filter",
+      "name": "Filter",
+      "position": {"x": 600, "y": 200, "z": 0},
+      "mesh": "Cube",
+      "scale": {"x": 1.2, "y": 1.2, "z": 1.8},
+      "data_index": 7,
+      "ports": {
+        "A": "inlet",
+        "B": "outlet"
+      }
+    }
+  ],
+  "connections": [
+    {
+      "id": "pipe_01",
+      "name": "Pump to Relief Valve",
+      "from": {"component": "FlowSource", "port": "B"},
+      "to": {"component": "ReliefValve", "port": "A"},
+      "waypoints": [
+        {"x": 0, "y": 800, "z": 0},
+        {"x": -300, "y": 800, "z": 0},
+        {"x": -600, "y": 650, "z": 0},
+        {"x": -600, "y": 500, "z": 0}
+      ],
+      "flow_data_index": 0
+    },
+    {
+      "id": "pipe_02",
+      "name": "Relief Valve to Tank",
+      "from": {"component": "ReliefValve", "port": "B"},
+      "to": {"component": "Tank", "port": "A"},
+      "waypoints": [
+        {"x": -600, "y": 500, "z": 0},
+        {"x": -600, "y": 200, "z": 0},
+        {"x": -300, "y": 0, "z": 0},
+        {"x": 0, "y": 0, "z": 0}
+      ],
+      "flow_data_index": 1
+    },
+    {
+      "id": "pipe_03",
+      "name": "Pump to Vent Valve",
+      "from": {"component": "FlowSource", "port": "B"},
+      "to": {"component": "VentValve", "port": "A"},
+      "waypoints": [
+        {"x": 0, "y": 800, "z": 0},
+        {"x": 0, "y": 650, "z": 0},
+        {"x": 0, "y": 500, "z": 0}
+      ],
+      "flow_data_index": 2
+    },
+    {
+      "id": "pipe_04",
+      "name": "Vent Valve to Tank",
+      "from": {"component": "VentValve", "port": "B"},
+      "to": {"component": "Tank", "port": "A"},
+      "waypoints": [
+        {"x": 0, "y": 500, "z": 0},
+        {"x": 0, "y": 200, "z": 0},
+        {"x": 0, "y": 0, "z": 0}
+      ],
+      "flow_data_index": 3
+    },
+    {
+      "id": "pipe_05",
+      "name": "Pump to Directional Valve",
+      "from": {"component": "FlowSource", "port": "B"},
+      "to": {"component": "DirectionalValve", "port": "P"},
+      "waypoints": [
+        {"x": 0, "y": 800, "z": 0},
+        {"x": 300, "y": 800, "z": 0},
+        {"x": 600, "y": 650, "z": 0},
+        {"x": 600, "y": 500, "z": 0}
+      ],
+      "flow_data_index": 4
+    },
+    {
+      "id": "pipe_06",
+      "name": "Directional Valve to Cylinder Cap-End",
+      "from": {"component": "DirectionalValve", "port": "A"},
+      "to": {"component": "Cylinder", "port": "A"},
+      "waypoints": [
+        {"x": 600, "y": 500, "z": 0},
+        {"x": 600, "y": 850, "z": 0},
+        {"x": 600, "y": 1200, "z": 0}
+      ],
+      "flow_data_index": 5
+    },
+    {
+      "id": "pipe_07",
+      "name": "Cylinder Rod-End to Flow Restriction",
+      "from": {"component": "Cylinder", "port": "B"},
+      "to": {"component": "FlowRestriction", "port": "A"},
+      "waypoints": [
+        {"x": 600, "y": 1200, "z": 0},
+        {"x": 700, "y": 1100, "z": 0},
+        {"x": 800, "y": 900, "z": 0}
+      ],
+      "flow_data_index": 6
+    },
+    {
+      "id": "pipe_08",
+      "name": "Flow Restriction to Directional Valve Rod-End",
+      "from": {"component": "FlowRestriction", "port": "B"},
+      "to": {"component": "DirectionalValve", "port": "B"},
+      "waypoints": [
+        {"x": 800, "y": 900, "z": 0},
+        {"x": 800, "y": 700, "z": 0},
+        {"x": 700, "y": 500, "z": 0},
+        {"x": 600, "y": 500, "z": 0}
+      ],
+      "flow_data_index": 7
+    },
+    {
+      "id": "pipe_09",
+      "name": "Directional Valve to Check Valve (Parallel)",
+      "from": {"component": "DirectionalValve", "port": "B"},
+      "to": {"component": "CheckValve", "port": "A"},
+      "waypoints": [
+        {"x": 600, "y": 500, "z": 0},
+        {"x": 500, "y": 700, "z": 0},
+        {"x": 400, "y": 900, "z": 0}
+      ],
+      "flow_data_index": 8
+    },
+    {
+      "id": "pipe_10",
+      "name": "Check Valve to Cylinder Rod-End (Parallel)",
+      "from": {"component": "CheckValve", "port": "B"},
+      "to": {"component": "Cylinder", "port": "B"},
+      "waypoints": [
+        {"x": 400, "y": 900, "z": 0},
+        {"x": 500, "y": 1100, "z": 0},
+        {"x": 600, "y": 1200, "z": 0}
+      ],
+      "flow_data_index": 9
+    },
+    {
+      "id": "pipe_11",
+      "name": "Directional Valve to Filter",
+      "from": {"component": "DirectionalValve", "port": "T"},
+      "to": {"component": "Filter", "port": "A"},
+      "waypoints": [
+        {"x": 600, "y": 500, "z": 0},
+        {"x": 600, "y": 350, "z": 0},
+        {"x": 600, "y": 200, "z": 0}
+      ],
+      "flow_data_index": 10
+    },
+    {
+      "id": "pipe_12",
+      "name": "Filter to Tank",
+      "from": {"component": "Filter", "port": "B"},
+      "to": {"component": "Tank", "port": "A"},
+      "waypoints": [
+        {"x": 600, "y": 200, "z": 0},
+        {"x": 300, "y": 100, "z": 0},
+        {"x": 0, "y": 0, "z": 0}
+      ],
+      "flow_data_index": 11
+    }
+  ],
+  "data_mapping": {
+    "comment": "Maps JSON array indices to components",
+    "pressure_indices": {
+      "0": "FlowSource port B",
+      "1": "ReliefValve port A",
+      "2": "ReliefValve port B",
+      "3": "VentValve port A",
+      "4": "VentValve port B",
+      "5": "DirectionalValve port P",
+      "6": "DirectionalValve port T",
+      "7": "DirectionalValve port A",
+      "8": "DirectionalValve port B",
+      "9": "Cylinder chamber A",
+      "10": "Cylinder chamber B",
+      "11": "FlowRestriction port A",
+      "12": "FlowRestriction port B",
+      "13": "CheckValve port A",
+      "14": "CheckValve port B",
+      "15": "Filter port A",
+      "16": "Filter port B",
+      "17": "Tank port A"
+    },
+    "flow_indices": {
+      "0": "ReliefValve flow",
+      "1": "VentValve flow",
+      "2": "DirectionalValve P flow",
+      "3": "DirectionalValve T flow",
+      "4": "DirectionalValve A flow",
+      "5": "DirectionalValve B flow",
+      "6": "Cylinder chamber A flow",
+      "7": "FlowRestriction flow",
+      "8": "CheckValve flow",
+      "9": "Filter flow",
+      "10": "Tank inlet flow"
+    }
+  }
+}
