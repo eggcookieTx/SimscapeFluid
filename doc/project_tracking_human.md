@@ -48,14 +48,45 @@ Quick reference for project status. For detailed context, see project_tracking_l
   - Manager spawns placeholder actors (`Pump_01..06`, `Cylinder_01`, `PipeSpline_01..04`) and updates their Z positions based on normalized pressure (simple POC visualization).
 - Updated `doc/UNREAL_SCENE_SCAFFOLD.md` with step-by-step usage instructions for `APlaybackManager`.
 
+## Recent Progress (Jan 5, 2026)
+
+**✓ Fixed Critical Bugs:**
+- Fixed crash on second PIE run: Added cleanup logic to destroy existing actors by name before spawning new ones
+- Fixed mobility warnings: Set `EComponentMobility::Movable` on spawned StaticMeshComponents
+- Rebuilt successfully, tested PIE → Stop → Play cycle with no crashes
+- Committed and pushed all changes to dev repo
+
+**✓ Testing Confirmed:**
+- PlaybackManager loads 31,671 frames successfully
+- Spawns 11 placeholder actors without errors
+- Basic Z-position animation working (no meshes yet, actors are invisible)
+- No crash on multiple PIE runs
+
+## Current Task (Jan 5, 2026)
+
+**✓ Pressure Visualization Complete - Working!**
+
+Goal: Make the invisible actors visible and show pressure changes with color
+
+Steps:
+1. ✓ Created M_Pressure material via Python automation (blue=low, red=high gradient)
+2. ✓ Assigned cube meshes to pumps, cylinder mesh to cylinder actors
+3. ✓ Created Material Instance Dynamic (MID) in C++ for each actor
+4. ✓ Updated `UpdateActorStates()` to set scalar parameter "Pressure" (normalized to 0-224kPa range)
+5. ✓ Tested playback - color changes visible, actors animating vertically
+6. ✓ Fixed normalization: Changed from 10 MPa to 0.224 MPa to match actual data range
+
+**Result:** 6 cubes (pumps) + 1 cylinder now visible, colors animate blue→purple→red based on pressure data
+
 ## Immediate Next Steps
 
-1. Open the Editor, place `APlaybackManager` in the level, configure `DataFilePath` to `Content/Data/unreal_playback.json`, and test PIE playback.
-2. Assign static meshes (cubes/cylinders from Starter Content) to spawned actors for visual feedback.
-3. Create dynamic material `M_Pressure` with scalar parameter and assign to actors; map pressure indices to material updates.
-4. Add Niagara flow emitters and map flow data to `SpawnRate` parameter.
-5. Integrate cylinder rod displacement (integrate `RodVelocity` and update Z transform).
-6. Validate full playback at 30 Hz with all 31,671 frames and confirm stable frame rate.
+1. ✓ Open the Editor, place `APlaybackManager` in the level, configure `DataFilePath`, and test playback
+2. ✓ Assign static meshes (cubes/cylinders from Engine BasicShapes) to spawned actors for visual feedback
+3. ✓ Create dynamic material `M_Pressure` with scalar parameter and assign to actors; map pressure to color
+4. **[NEXT]** Add flow visualization using Niagara particle systems (map flow data to spawn rate)
+5. **[NEXT]** Implement cylinder rod extension/retraction based on `rod.vel` integration
+6. **[NEXT]** Add UI overlay (UMG widget) displaying real-time pressure/flow values
+7. Validate full playback at 30 Hz with all 31,671 frames and confirm stable frame rate
 
 ## Implementation Plan
 
