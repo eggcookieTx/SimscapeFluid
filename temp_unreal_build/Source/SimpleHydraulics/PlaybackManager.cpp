@@ -42,10 +42,16 @@ APlaybackManager::APlaybackManager()
 	FlowSpeedScale = 100000.0f;  // cm/s per m³/s - for Niagara velocity parameter
 
 	// Load default Niagara system for flow visualization
-	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> NiagaraSystemAsset(TEXT("/Engine/VFX/Niagara/Systems/NS_GPUSprites"));
+	// Using Fountain system which has built-in SpawnRate parameter
+	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> NiagaraSystemAsset(TEXT("/Niagara/Systems/Fountain"));
 	if (NiagaraSystemAsset.Succeeded())
 	{
 		FlowParticleSystem = NiagaraSystemAsset.Object;
+		UE_LOG(LogTemp, Log, TEXT("Loaded Niagara Fountain system for flow visualization"));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Failed to load Niagara Fountain system - flow particles may not appear"));
 	}
 
 	// Load default meshes from Engine Content
@@ -786,11 +792,27 @@ void APlaybackManager::SpawnFromTopology()
 				TextRender->AttachToComponent(MeshActor->GetRootComponent(), FAttachmentTransformRules::KeepRelativeTransform);
 				TextRender->SetRelativeLocation(FVector(0, 0, 150));  // 150 cm above component
 				TextRender->SetText(FText::FromString(Comp.Name));
-				TextRender->SetWorldSize(50.0f);  // Even larger text
+				TextRender->SetWorldSize(80.0f);  // Very large text
 				TextRender->SetHorizontalAlignment(EHTA_Center);
 				TextRender->SetVerticalAlignment(EVRTA_TextCenter);
 				TextRender->SetTextRenderColor(FColor(255, 255, 0, 255));  // Bright yellow RGBA
-				TextRender->SetTextMaterial(nullptr);  // Use default text material
+				
+				// Create unlit material for text to be always visible
+				UMaterial* UnlitMat = LoadObject<UMaterial>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial"));
+				if (UnlitMat)
+				{
+					UMaterialInstanceDynamic* TextMat = UMaterialInstanceDynamic::Create(UnlitMat, this);
+					if (TextMat)
+					{
+						TextMat->SetVectorParameterValue(FName("Color"), FLinearColor(1.0f, 1.0f, 0.0f, 1.0f)); // Yellow
+						TextRender->SetTextMaterial(TextMat);
+					}
+				}
+				
+				// Make text always face camera (billboard)
+				TextRender->SetHorizSpacingAdjust(1.2f);  // Wider spacing for readability
+				
+				UE_LOG(LogTemp, Log, TEXT("Created label for %s at relative Z=150"), *Comp.Name);
 			}
 
 			SpawnedActors.Add(MeshActor);
@@ -932,14 +954,19 @@ void APlaybackManager::SpawnFlowParticles()
 	{
 		if (!FlowParticleSystem)
 		{
-			UE_LOG(LogTemp, Warning, TEXT("FlowParticleSystem not set - cannot spawn flow visualization"));
+			UE_LOG(LogTemp, Error, TEXT("FlowParticleSystem not set - cannot spawn flow visualization. Make sure Niagara Fountain system is available."));
+		}
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("No pipes to attach flow particles (PipeSplineActors=%d)"), PipeSplineActors.Num());
 		}
 		return;
 	}
 
 	ClearFlowParticles();
 
-	UE_LOG(LogTemp, Log, TEXT("Spawning Niagara flow particles for %d pipes"), PipeConnections.Num());
+	UE_LOG(LogTemp, Warning, TEXT("==== Spawning Niagara flow particles for %d pipes ===="), PipeConnections.Num());
+	UE_LOG(LogTemp, Warning, TEXT("Using Niagara System: %s"), *FlowParticleSystem->GetName());
 
 	// Spawn one Niagara component per pipe, attached to the spline root
 	for (int32 PipeIdx = 0; PipeIdx < PipeSplineActors.Num(); ++PipeIdx)
@@ -947,14 +974,24 @@ void APlaybackManager::SpawnFlowParticles()
 		AActor* PipeActor = PipeSplineActors[PipeIdx];
 		if (!PipeActor)
 		{
+			UE_LOG(LogTemp, Warning, TEXT("  Pipe %d: No actor, skipping"), PipeIdx);
 			continue;
 		}
 
 		USplineComponent* SplineComp = PipeActor->FindComponentByClass<USplineComponent>();
 		if (!SplineComp)
 		{
+			UE_LOG(LogTemp, Warning, TEXT("  Pipe %d: No spline component, skipping"), PipeIdx);
 			continue;
 		}
+
+		// Get spline properties for debugging
+		float SplineLength = SplineComp->GetSplineLength();
+		FVector SplineStart = SplineComp->GetLocationAtDistanceAlongSpline(0, ESplineCoordinateSpace::World);
+		FVector SplineEnd = SplineComp->GetLocationAtDistanceAlongSpline(SplineLength, ESplineCoordinateSpace::World);
+		
+		UE_LOG(LogTemp, Warning, TEXT("  Pipe %d: Spline length=%.1f cm, Start=(%.1f,%.1f,%.1f), End=(%.1f,%.1f,%.1f)"),
+			PipeIdx, SplineLength, SplineStart.X, SplineStart.Y, SplineStart.Z, SplineEnd.X, SplineEnd.Y, SplineEnd.Z);
 
 		// Create Niagara component attached to the pipe spline
 		UNiagaraComponent* NiagaraComp = UNiagaraFunctionLibrary::SpawnSystemAttached(
@@ -969,10 +1006,17 @@ void APlaybackManager::SpawnFlowParticles()
 
 		if (NiagaraComp)
 		{
-			// Set initial parameters
-			NiagaraComp->SetFloatParameter(FName("SpawnRate"), 0.0f);  // Will be updated based on flow
-			NiagaraComp->SetFloatParameter(FName("Velocity"), 0.0f);  // Will be updated based on flow
-			NiagaraComp->SetVectorParameter(FName("ParticleColor"), FVector(0.0f, 0.8f, 1.0f));  // Cyan color for fluid
+			// Try setting common Niagara parameters (may not exist in all systems)
+			NiagaraComp->SetFloatParameter(FName("User.SpawnRate"), 10.0f);  // Try User namespace
+			NiagaraComp->SetFloatParameter(FName("SpawnRate"), 10.0f);  // Try default namespace
+			NiagaraComp->SetFloatParameter(FName("Fountain.SpawnRate"), 10.0f);  // Try Fountain namespace
+			
+			// Scale down the effect to fit inside pipes
+			NiagaraComp->SetRelativeScale3D(FVector(0.1f, 0.1f, 0.1f));
+			
+			// Make particles cyan/blue for water-like appearance
+			NiagaraComp->SetVariableLinearColor(FName("User.Color"), FLinearColor(0.0f, 0.8f, 1.0f));
+			NiagaraComp->SetVariableLinearColor(FName("Color"), FLinearColor(0.0f, 0.8f, 1.0f));
 
 			// Store in particle array
 			FFlowParticle Particle;
@@ -980,11 +1024,15 @@ void APlaybackManager::SpawnFlowParticles()
 			Particle.PipeIndex = PipeIdx;
 			FlowParticles.Add(Particle);
 
-			UE_LOG(LogTemp, Log, TEXT("Spawned Niagara component for Pipe %d"), PipeIdx);
+			UE_LOG(LogTemp, Warning, TEXT("  Pipe %d: SUCCESS - Spawned Niagara component, scale=0.1"), PipeIdx);
+		}
+		else
+		{
+			UE_LOG(LogTemp, Error, TEXT("  Pipe %d: FAILED to spawn Niagara component!"), PipeIdx);
 		}
 	}
 
-	UE_LOG(LogTemp, Log, TEXT("Spawned %d Niagara flow particle systems across %d pipes"), FlowParticles.Num(), PipeSplineActors.Num());
+	UE_LOG(LogTemp, Warning, TEXT("==== Spawned %d Niagara flow particle systems across %d pipes ===="), FlowParticles.Num(), PipeSplineActors.Num());
 }
 
 void APlaybackManager::ClearFlowParticles()
