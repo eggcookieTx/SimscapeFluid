@@ -4,6 +4,118 @@ This document is designed for LLM context. It can be detailed and verbose to pro
 
 ## Session History
 
+### Jan 6, 2026 - Niagara Flow Particles + Scene Lighting + Topology Complete
+
+**Major Milestones Achieved:**
+- ✅ Pipe-focused visualization architecture implemented (P&ID topology)
+- ✅ Pressure visualization working on all 12 pipes (blue→red gradient)
+- ✅ Automatic scene lighting (directional + sky light)
+- ✅ Text labels for 9 components
+- ⚠️ Niagara flow particles blocked (Fountain system missing)
+
+**Actions Completed:**
+
+1. **Topology System (Commits 6d44171, 3b2b0e8):**
+   - Created `data/topology.json` with P&ID layout (9 components, 12 pipe connections)
+   - Each pipe connection has: name, from/to components, waypoints, pressure_index, flow_index
+   - Updated PlaybackManager to parse topology JSON instead of spawning grid
+   - Implemented USplineComponent for pipe routing with 3D waypoints
+   - Created USplineMeshComponent for visual pipe rendering (30cm diameter)
+   - Applied M_Pressure material to all 12 pipe segments successfully
+   - Added UTextRenderComponent labels for component names (positioned 150cm above)
+
+2. **Niagara Integration (Commit 2c38792):**
+   - Refactored flow visualization from sphere meshes to Niagara particle systems
+   - Added Niagara module to Build.cs PublicDependencyModuleNames
+   - Modified FFlowParticle struct: UNiagaraComponent* instead of AActor*
+   - Initial system: `/Engine/VFX/Niagara/Systems/NS_GPUSprites`
+   - SpawnFlowParticles(): One UNiagaraComponent per pipe attached to spline root
+   - UpdateFlowParticles(): Sets SpawnRate (FlowMagnitude × 100000) and Velocity parameters
+   - Removed sphere mesh approach (deprecated but working in commit 8b72ee5)
+
+3. **Scene Lighting (Commit 824855a):**
+   - Implemented SpawnSceneLighting() method in PlaybackManager
+   - DirectionalLight: 5.0 intensity, warm white (1.0, 0.95, 0.9), 45° angle, casts shadows
+   - SkyLight: 1.0 intensity, cool blue (0.5, 0.6, 0.8) ambient
+   - Smart duplicate detection: checks for existing lights before spawning
+   - Called automatically in BeginPlay()
+
+4. **Visualization Fixes (Commit 93b7c7b - CURRENT):**
+   - **Issue**: User reported "light source doesn't show labels, no niagara fall inside pipe"
+   - **Research**: Fetched Epic's Niagara documentation
+   - **Discovery**: NS_GPUSprites is generic template, lacks custom parameters (SpawnRate, Velocity)
+   - **Text Label Fix**: Added BasicShapeMaterial as unlit base, increased size 50→80 units, added dynamic material with yellow color
+   - **Niagara System Change**: Switched from NS_GPUSprites to `/Niagara/Systems/Fountain`
+   - **Scale Fix**: Set RelativeScale3D to 0.1x to fit particles inside pipes
+   - **Parameter Namespaces**: Tried User.SpawnRate, SpawnRate, Fountain.SpawnRate
+   - **Debug Logging**: Added comprehensive per-pipe logging with spline info and SUCCESS/FAILED status
+
+**Critical Blocker Found (Runtime Testing):**
+```
+LogTemp: Error: FlowParticleSystem not set - cannot spawn flow visualization. 
+Make sure Niagara Fountain system is available.
+```
+
+**Root Cause:**
+- `/Niagara/Systems/Fountain` does NOT exist in UE 5.7 installation
+- FObjectFinder failed to load system
+- FlowParticleSystem = nullptr
+- No Niagara particles spawned
+
+**What's Working:**
+- ✅ Pressure visualization: All 12 pipes showing blue→red gradient based on data
+- ✅ Scene lighting: Both DirectionalLight and SkyLight spawned successfully
+- ✅ Text labels: Created for 9 components (yellow, positioned at 150cm)
+- ✅ Playback: 31,671 frames running at ~100 FPS (Frame 11→6711 in ~6 seconds)
+- ✅ Topology: All components and pipes in correct P&ID positions
+
+**What's NOT Working:**
+- ❌ Niagara flow particles: System failed to load, no particle spawning
+- ⚠️ Text label visibility: Unclear if unlit material fix worked (needs user confirmation)
+
+**Planned Resolution - Custom Niagara System:**
+
+**Approach**: Create purpose-built Niagara system via Python script
+- **Script**: `scripts/python/create_niagara_flow_system.py`
+- **Save Path**: `/Game/Niagara/NS_FlowParticles`
+- **System Features**:
+  * GPU sprite emitter for performance (handles 12 pipes × particles)
+  * User.SpawnRate parameter (0-100 particles/sec, controlled by flow data)
+  * User.Velocity parameter (cm/s, controlled by flow magnitude)
+  * Small particle size (5-10cm) to fit inside 30cm pipes
+  * Cyan color (water visualization)
+  * Particle lifetime ~2 seconds
+  * Velocity inheritance from spawn location
+- **C++ Update**: Change FlowParticleSystem path from `/Niagara/Systems/Fountain` to `/Game/Niagara/NS_FlowParticles`
+
+**Expected Outcome:**
+- Particles spawn inside each pipe at rates matching flow data
+- Particles move along pipe splines (visualizing fluid flow direction)
+- Real-time updates during playback (spawn rate changes with flow)
+- Visual feedback for hydraulic system operation
+
+**Git Commits (Jan 6 Session):**
+- `6d44171`: Topology JSON parsing with P&ID layout
+- `3b2b0e8`: Pipe-focused visualization with spline meshes
+- `8b72ee5`: Sphere mesh flow visualization (working, deprecated)
+- `2c38792`: Niagara particle system refactor
+- `824855a`: Automatic scene lighting
+- `93b7c7b`: Text label + Niagara Fountain fix attempt (blocked by missing system)
+
+**Testing Results:**
+- Build: Clean success (13.21 seconds)
+- Runtime: Pressure visualization perfect, Niagara blocked, lighting confirmed
+- Output Log: Clear error message identifying missing Fountain system
+- Frame rate: ~100 FPS during playback (excellent performance)
+
+**Next Task:**
+- Create custom Niagara system with User.SpawnRate and User.Velocity parameters
+- Test particle spawning and movement inside pipes
+- Verify flow visualization matches hydraulic data
+- Consider fallback to sphere mesh system if Niagara proves problematic
+
+---
+
 ### Jan 5, 2026 - Pressure Visualization Complete + Topology Planning
 
 **Major Milestone Achieved: Playback with Dynamic Material Visualization Working**

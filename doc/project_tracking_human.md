@@ -4,10 +4,9 @@ Quick reference for project status. For detailed context, see project_tracking_l
 
 ## Current Status
 
-- **Date**: December 31, 2025
- - **Date**: January 1, 2026
-- **Overall Progress**: Phase 1 Complete - Phase 2A Complete
-- **Current Phase**: Phase 3 & 4 - Unreal Layout & UDP Receiver (POC)
+- **Date**: January 6, 2026
+- **Overall Progress**: Phase 1 Complete - Phase 2A Complete - Phase 3 Nearly Complete
+- **Current Phase**: Phase 3 & 4 - Flow Visualization (Niagara System Creation)
 
 ## Completed
 - ✓ Folder structure created (data, doc, scripts, models)
@@ -48,6 +47,40 @@ Quick reference for project status. For detailed context, see project_tracking_l
   - Manager spawns placeholder actors (`Pump_01..06`, `Cylinder_01`, `PipeSpline_01..04`) and updates their Z positions based on normalized pressure (simple POC visualization).
 - Updated `doc/UNREAL_SCENE_SCAFFOLD.md` with step-by-step usage instructions for `APlaybackManager`.
 
+## Recent Progress (Jan 6, 2026)
+
+**✓ Topology & Pipe Visualization Complete:**
+- Created topology.json with P&ID layout (9 components, 12 pipe connections)
+- Implemented spline mesh rendering for all pipes (30cm diameter)
+- Pressure visualization working on all 12 pipes (blue→red gradient)
+- Component text labels added (yellow, 80 units, positioned above components)
+- Scene lighting implemented (directional + sky light, auto-spawn)
+- All builds successful, git commits: 6d44171, 3b2b0e8, 8b72ee5, 2c38792, 824855a, 93b7c7b
+
+**⚠️ Current Blocker - Niagara Flow Particles:**
+- Attempted to use `/Niagara/Systems/Fountain` - system does NOT exist in UE 5.7
+- FlowParticleSystem failed to load at runtime
+- No flow particles spawning (error: "FlowParticleSystem not set")
+- Text label visibility unclear (needs testing with improved unlit material)
+
+**✓ What's Working:**
+- Pressure visualization: Perfect, all pipes showing data-driven colors
+- Scene lighting: Both lights spawned successfully
+- Playback: 31,671 frames at ~100 FPS
+- Topology: Components and pipes in correct P&ID positions
+
+**❌ What's Blocked:**
+- Niagara particles: Missing Fountain system
+- Flow visualization: No particles appearing in pipes
+
+**📋 Next Task - Create Custom Niagara System:**
+- Write Python script to generate `/Game/Niagara/NS_FlowParticles`
+- Features: User.SpawnRate + User.Velocity parameters, 5-10cm particles, cyan color
+- Update PlaybackManager to load custom system instead of Fountain
+- Test particle spawning inside pipes with flow data driving spawn rate
+
+---
+
 ## Recent Progress (Jan 5, 2026)
 
 **✓ Fixed Critical Bugs:**
@@ -80,28 +113,40 @@ Steps:
 
 ---
 
-**[IN PROGRESS] Implement Proper P&ID Topology Layout**
+**✓ COMPLETE: P&ID Topology Layout**
+- topology.json created with all 9 components and 12 pipe connections
+- PlaybackManager reads topology and spawns splines with waypoints
+- Pressure visualization working on all pipes
+- Text labels for all components
 
-Goal: Replace random grid layout with actual hydraulic schematic topology
+**[IN PROGRESS] Create Custom Niagara Flow Particle System**
 
-Current State:
-- Actors spawn in simple grid (200 unit X spacing)
-- No visual representation of pipe connections
-- Layout doesn't match P&ID schematic
+Goal: Enable flow visualization inside pipes with data-driven particle spawning
 
-Plan (Options 1 + 3):
-1. **Create topology.json**: Define component 3D positions and connections matching P&ID
-   - Extract connection graph from Simscape model (12 pipe connections)
-   - Map to 3D coordinates matching hydraulic flow paths
-   - Include spline waypoints for pipe routing
-2. **MCP Scene Builder Script**: Programmatically build scene via Unreal MCP
-   - Read topology.json and spawn actors at correct positions
-   - Create spline actors for pipe connections with proper routing
-   - Apply materials and meshes matching component types
-3. **Update PlaybackManager**: Read topology data for spawning
-   - Load positions from JSON instead of grid calculation
-   - Spawn spline meshes between connected components
-   - Maintain data-driven animation (pressure, flow, rod velocity)
+Current Blocker:
+- `/Niagara/Systems/Fountain` does not exist in UE 5.7
+- FlowParticleSystem = nullptr at runtime
+- No particles spawning
+
+Plan:
+1. **Create Python Script** (`scripts/python/create_niagara_flow_system.py`):
+   - Generate custom Niagara system with GPU sprite emitter
+   - Add User.SpawnRate parameter (0-100 particles/sec)
+   - Add User.Velocity parameter (flow speed in cm/s)
+   - Set particle size 5-10cm (fits inside 30cm pipes)
+   - Use cyan color for water visualization
+   - Save as `/Game/Niagara/NS_FlowParticles`
+2. **Update PlaybackManager.cpp**:
+   - Change system path from `/Niagara/Systems/Fountain` to `/Game/Niagara/NS_FlowParticles`
+   - Rebuild and test particle spawning
+3. **Runtime Testing**:
+   - Verify particles spawn inside pipes
+   - Check spawn rate changes with flow data
+   - Validate particle movement along splines
+   - Confirm performance (12 pipes × particles)
+
+Fallback Option:
+- Revert to sphere mesh flow visualization (commit 8b72ee5) if Niagara proves problematic
 
 ## Immediate Next Steps
 
