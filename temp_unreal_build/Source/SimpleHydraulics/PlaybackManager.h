@@ -6,6 +6,9 @@
 #include "GameFramework/Actor.h"
 #include "PlaybackManager.generated.h"
 
+class UNiagaraComponent;
+class UNiagaraSystem;
+
 USTRUCT(BlueprintType)
 struct FSimulationFrame
 {
@@ -75,22 +78,14 @@ struct FFlowParticle
 	GENERATED_BODY()
 
 	UPROPERTY()
-	AActor* ParticleActor;
+	UNiagaraComponent* NiagaraComponent;
 
 	UPROPERTY()
 	int32 PipeIndex;
 
-	UPROPERTY()
-	float DistanceAlongSpline;
-
-	UPROPERTY()
-	float SplineLength;
-
 	FFlowParticle()
-		: ParticleActor(nullptr)
+		: NiagaraComponent(nullptr)
 		, PipeIndex(-1)
-		, DistanceAlongSpline(0.0f)
-		, SplineLength(0.0f)
 	{
 	}
 };
@@ -196,13 +191,13 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Playback|Visualization")
 	int32 MaxParticlesPerPipe;
 
-	/** Flow scale factor (multiplier for particle speed) */
+	/** Flow scale factor for Niagara velocity (multiplier for particle speed) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Playback|Visualization")
 	float FlowSpeedScale;
 
-	/** Particle size (cm) */
+	/** Niagara system for flow particle visualization */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Playback|Visualization")
-	float ParticleSize;
+	class UNiagaraSystem* FlowParticleSystem;
 
 	/** Static mesh for pumps */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Playback|Visualization")
@@ -264,9 +259,6 @@ protected:
 
 	UPROPERTY()
 	TArray<FFlowParticle> FlowParticles;
-
-	UPROPERTY()
-	TArray<float> PipeSplineLengths;
 
 	bool bIsPlaying;
 	int32 CurrentFrameIndex;

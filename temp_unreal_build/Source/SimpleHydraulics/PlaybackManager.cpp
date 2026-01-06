@@ -14,6 +14,9 @@
 #include "UObject/ConstructorHelpers.h"
 #include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "NiagaraComponent.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraSystem.h"
 
 APlaybackManager::APlaybackManager()
 {
@@ -32,8 +35,14 @@ APlaybackManager::APlaybackManager()
 	// Flow particle settings
 	bEnableFlowParticles = true;
 	MaxParticlesPerPipe = 8;
-	FlowSpeedScale = 100000.0f;  // cm/s per m³/s - MASSIVELY increased for tiny flow values
-	ParticleSize = 20.0f;  // 20cm spheres - larger for visibility
+	FlowSpeedScale = 100000.0f;  // cm/s per m³/s - for Niagara velocity parameter
+
+	// Load default Niagara system for flow visualization
+	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> NiagaraSystemAsset(TEXT("/Engine/VFX/Niagara/Systems/NS_GPUSprites"));
+	if (NiagaraSystemAsset.Succeeded())
+	{
+		FlowParticleSystem = NiagaraSystemAsset.Object;
+	}
 
 	// Load default meshes from Engine Content
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(TEXT("/Engine/BasicShapes/Cube"));
@@ -850,97 +859,73 @@ void APlaybackManager::SpawnPipeSplines()
 void APlaybackManager::SpawnFlowParticles()
 {
 	UWorld* World = GetWorld();
-	if (!World || PipeSplineActors.Num() == 0)
+	if (!World || PipeSplineActors.Num() == 0 || !FlowParticleSystem)
 	{
+		if (!FlowParticleSystem)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("FlowParticleSystem not set - cannot spawn flow visualization"));
+		}
 		return;
 	}
 
 	ClearFlowParticles();
-	PipeSplineLengths.Empty();
 
-	UE_LOG(LogTemp, Log, TEXT("Spawning flow particles for %d pipes"), PipeConnections.Num());
+	UE_LOG(LogTemp, Log, TEXT("Spawning Niagara flow particles for %d pipes"), PipeConnections.Num());
 
-	// Get sphere mesh for particles
-	UStaticMesh* SphereMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere"));
-	if (!SphereMesh)
-	{
-		UE_LOG(LogTemp, Error, TEXT("Failed to load sphere mesh for flow particles"));
-		return;
-	}
-
+	// Spawn one Niagara component per pipe, attached to the spline root
 	for (int32 PipeIdx = 0; PipeIdx < PipeSplineActors.Num(); ++PipeIdx)
 	{
 		AActor* PipeActor = PipeSplineActors[PipeIdx];
 		if (!PipeActor)
 		{
-			PipeSplineLengths.Add(0.0f);
 			continue;
 		}
 
 		USplineComponent* SplineComp = PipeActor->FindComponentByClass<USplineComponent>();
 		if (!SplineComp)
 		{
-			PipeSplineLengths.Add(0.0f);
 			continue;
 		}
 
-		float SplineLength = SplineComp->GetSplineLength();
-		PipeSplineLengths.Add(SplineLength);
+		// Create Niagara component attached to the pipe spline
+		UNiagaraComponent* NiagaraComp = UNiagaraFunctionLibrary::SpawnSystemAttached(
+			FlowParticleSystem,
+			SplineComp,
+			NAME_None,
+			FVector::ZeroVector,
+			FRotator::ZeroRotator,
+			EAttachLocation::KeepRelativeOffset,
+			true  // Auto-activate
+		);
 
-		// Spawn particles along this pipe
-		for (int32 ParticleIdx = 0; ParticleIdx < MaxParticlesPerPipe; ++ParticleIdx)
+		if (NiagaraComp)
 		{
-			// Distribute particles evenly along spline initially
-			float InitialDist = (SplineLength / (MaxParticlesPerPipe + 1)) * (ParticleIdx + 1);
-			FVector ParticlePos = SplineComp->GetLocationAtDistanceAlongSpline(InitialDist, ESplineCoordinateSpace::World);
+			// Set initial parameters
+			NiagaraComp->SetFloatParameter(FName("SpawnRate"), 0.0f);  // Will be updated based on flow
+			NiagaraComp->SetFloatParameter(FName("Velocity"), 0.0f);  // Will be updated based on flow
+			NiagaraComp->SetVectorParameter(FName("ParticleColor"), FVector(0.0f, 0.8f, 1.0f));  // Cyan color for fluid
 
-			FActorSpawnParameters SpawnParams;
-			SpawnParams.Name = FName(*FString::Printf(TEXT("FlowParticle_Pipe%d_%d"), PipeIdx, ParticleIdx));
-			AStaticMeshActor* ParticleActor = World->SpawnActor<AStaticMeshActor>(AStaticMeshActor::StaticClass(), ParticlePos, FRotator::ZeroRotator, SpawnParams);
+			// Store in particle array
+			FFlowParticle Particle;
+			Particle.NiagaraComponent = NiagaraComp;
+			Particle.PipeIndex = PipeIdx;
+			FlowParticles.Add(Particle);
 
-			if (ParticleActor)
-			{
-				UStaticMeshComponent* MeshComp = ParticleActor->GetStaticMeshComponent();
-				if (MeshComp)
-				{
-					MeshComp->SetStaticMesh(SphereMesh);
-					MeshComp->SetMobility(EComponentMobility::Movable);
-					MeshComp->SetWorldScale3D(FVector(ParticleSize / 50.0f));  // Sphere is 100cm default, scale to desired size
-					MeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-					
-					// Use simple bright color override - force it to be very visible
-					MeshComp->SetVectorParameterValueOnMaterials(FName("Color"), FVector(10.0f, 10.0f, 0.0f));  // Very bright yellow (emissive boost)
-					
-					// Override with basic vertex color for guaranteed visibility
-					MeshComp->SetCustomPrimitiveDataFloat(0, 1.0f);
-					
-					// Log first particle for debugging
-					if (PipeIdx == 0 && ParticleIdx == 0)
-					{
-						UE_LOG(LogTemp, Warning, TEXT("First flow particle spawned at: %s"), *ParticlePos.ToString());
-					}
-				}
-
-				FFlowParticle Particle;
-				Particle.ParticleActor = ParticleActor;
-				Particle.PipeIndex = PipeIdx;
-				Particle.DistanceAlongSpline = InitialDist;
-				Particle.SplineLength = SplineLength;
-				FlowParticles.Add(Particle);
-			}
+			UE_LOG(LogTemp, Log, TEXT("Spawned Niagara component for Pipe %d"), PipeIdx);
 		}
 	}
 
-	UE_LOG(LogTemp, Warning, TEXT("Spawned %d flow particles across %d pipes"), FlowParticles.Num(), PipeSplineActors.Num());
+	UE_LOG(LogTemp, Log, TEXT("Spawned %d Niagara flow particle systems across %d pipes"), FlowParticles.Num(), PipeSplineActors.Num());
 }
 
 void APlaybackManager::ClearFlowParticles()
 {
 	for (FFlowParticle& Particle : FlowParticles)
 	{
-		if (Particle.ParticleActor)
+		if (Particle.NiagaraComponent)
 		{
-			Particle.ParticleActor->Destroy();
+			Particle.NiagaraComponent->DeactivateImmediate();
+			Particle.NiagaraComponent->DestroyComponent();
 		}
 	}
 	FlowParticles.Empty();
@@ -958,23 +943,12 @@ void APlaybackManager::UpdateFlowParticles(float DeltaTime, const FSimulationFra
 
 	for (FFlowParticle& Particle : FlowParticles)
 	{
-		if (!Particle.ParticleActor || Particle.PipeIndex < 0 || Particle.PipeIndex >= PipeConnections.Num())
+		if (!Particle.NiagaraComponent || Particle.PipeIndex < 0 || Particle.PipeIndex >= PipeConnections.Num())
 		{
 			continue;
 		}
 
 		const FPipeConnection& Pipe = PipeConnections[Particle.PipeIndex];
-		AActor* PipeActor = PipeSplineActors[Particle.PipeIndex];
-		if (!PipeActor)
-		{
-			continue;
-		}
-
-		USplineComponent* SplineComp = PipeActor->FindComponentByClass<USplineComponent>();
-		if (!SplineComp)
-		{
-			continue;
-		}
 
 		// Get flow data for this pipe
 		float FlowValue = 0.0f;
@@ -986,43 +960,26 @@ void APlaybackManager::UpdateFlowParticles(float DeltaTime, const FSimulationFra
 		// Debug log for first pipe
 		if (bShouldLog && Particle.PipeIndex == 0)
 		{
-			UE_LOG(LogTemp, Log, TEXT("Pipe 0 Flow: %.6f m³/s, Particle pos: %.1f/%.1f cm"), 
-				FlowValue, Particle.DistanceAlongSpline, Particle.SplineLength);
+			UE_LOG(LogTemp, Log, TEXT("Pipe 0 Flow: %.6f m³/s, Niagara velocity: %.1f cm/s"), 
+				FlowValue, FlowValue * FlowSpeedScale);
 		}
 
-		// Convert flow to velocity along spline (cm/s)
-		// Positive flow: moves from→to (forward), Negative: to→from (backward)
-		float Velocity = FlowValue * FlowSpeedScale;  // cm/s
-
-		// Update particle position along spline
-		Particle.DistanceAlongSpline += Velocity * DeltaTime;
-
-		// Wrap around if particle goes past spline ends
-		if (Particle.DistanceAlongSpline > Particle.SplineLength)
-		{
-			Particle.DistanceAlongSpline = 0.0f;
-		}
-		else if (Particle.DistanceAlongSpline < 0.0f)
-		{
-			Particle.DistanceAlongSpline = Particle.SplineLength;
-		}
-
-		// Update particle actor position
-		FVector NewPos = SplineComp->GetLocationAtDistanceAlongSpline(Particle.DistanceAlongSpline, ESplineCoordinateSpace::World);
-		
-		// Offset particles ABOVE the pipe so they're visible (not hidden inside pipe mesh)
-		FVector UpVector = SplineComp->GetUpVectorAtDistanceAlongSpline(Particle.DistanceAlongSpline, ESplineCoordinateSpace::World);
-		NewPos += UpVector * 40.0f;  // Offset 40cm above pipe center
-		
-		Particle.ParticleActor->SetActorLocation(NewPos);
-
-		// Optional: Scale particle based on flow magnitude
+		// Convert flow to Niagara parameters
 		float FlowMagnitude = FMath::Abs(FlowValue);
-		float ParticleScale = FMath::Clamp(FlowMagnitude * 10.0f, 0.5f, 2.0f);  // Scale particles based on flow rate
-		if (UStaticMeshComponent* MeshComp = Cast<UStaticMeshComponent>(Particle.ParticleActor->GetRootComponent()))
-		{
-			MeshComp->SetWorldScale3D(FVector(ParticleScale * ParticleSize / 50.0f));
-		}
+		float Velocity = FlowValue * FlowSpeedScale;  // cm/s - direction preserved (positive/negative)
+		
+		// Spawn rate based on flow magnitude: more flow = more particles
+		// Scale spawn rate from 0 to 100 particles/sec based on flow
+		float SpawnRate = FMath::Clamp(FlowMagnitude * 100000.0f, 0.0f, 100.0f);  // 0-100 particles/sec
+
+		// Update Niagara parameters
+		Particle.NiagaraComponent->SetFloatParameter(FName("SpawnRate"), SpawnRate);
+		Particle.NiagaraComponent->SetFloatParameter(FName("Velocity"), Velocity);
+		Particle.NiagaraComponent->SetFloatParameter(FName("ParticleLifetime"), 2.0f);  // Particles live 2 seconds
+		
+		// Optional: Adjust particle size based on flow magnitude
+		float ParticleSize = FMath::Clamp(FlowMagnitude * 5000.0f, 5.0f, 20.0f);  // 5-20cm particles
+		Particle.NiagaraComponent->SetFloatParameter(FName("ParticleSize"), ParticleSize);
 	}
 
 	LogCounter++;
