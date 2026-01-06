@@ -17,6 +17,10 @@
 #include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
+#include "Engine/DirectionalLight.h"
+#include "Components/DirectionalLightComponent.h"
+#include "Components/SkyLightComponent.h"
+#include "Engine/SkyLight.h"
 
 APlaybackManager::APlaybackManager()
 {
@@ -75,6 +79,9 @@ void APlaybackManager::BeginPlay()
 		SpawnPlaceholderActors();
 	}
 
+	// Spawn scene lighting for better visualization
+	SpawnSceneLighting();
+
 	if (!bStartPaused && SimulationFrames.Num() > 0)
 	{
 		Play();
@@ -117,6 +124,68 @@ void APlaybackManager::Tick(float DeltaTime)
 	if (CurrentFrameIndex >= SimulationFrames.Num() - 1)
 	{
 		Stop();
+	}
+}
+
+void APlaybackManager::SpawnSceneLighting()
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	// Check if directional light already exists in the scene
+	TArray<AActor*> FoundLights;
+	UGameplayStatics::GetAllActorsOfClass(World, ADirectionalLight::StaticClass(), FoundLights);
+	
+	if (FoundLights.Num() == 0)
+	{
+		// Spawn a directional light (sun)
+		FVector LightLocation(0.0f, 0.0f, 1000.0f);
+		FRotator LightRotation(-45.0f, 45.0f, 0.0f);  // Angled down from above
+		
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.Name = FName(TEXT("MainDirectionalLight"));
+		ADirectionalLight* DirectionalLight = World->SpawnActor<ADirectionalLight>(ADirectionalLight::StaticClass(), LightLocation, LightRotation, SpawnParams);
+		
+		if (DirectionalLight)
+		{
+			UDirectionalLightComponent* LightComp = DirectionalLight->GetComponent();
+			if (LightComp)
+			{
+				LightComp->SetIntensity(5.0f);  // Bright sunlight
+				LightComp->SetLightColor(FLinearColor(1.0f, 0.95f, 0.9f));  // Slightly warm white
+				LightComp->SetCastShadows(true);
+			}
+			UE_LOG(LogTemp, Log, TEXT("Spawned Directional Light for scene illumination"));
+		}
+	}
+
+	// Check if sky light already exists
+	TArray<AActor*> FoundSkyLights;
+	UGameplayStatics::GetAllActorsOfClass(World, ASkyLight::StaticClass(), FoundSkyLights);
+	
+	if (FoundSkyLights.Num() == 0)
+	{
+		// Spawn a sky light for ambient lighting
+		FVector SkyLightLocation(0.0f, 0.0f, 500.0f);
+		
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.Name = FName(TEXT("MainSkyLight"));
+		ASkyLight* SkyLight = World->SpawnActor<ASkyLight>(ASkyLight::StaticClass(), SkyLightLocation, FRotator::ZeroRotator, SpawnParams);
+		
+		if (SkyLight)
+		{
+			USkyLightComponent* SkyLightComp = SkyLight->GetLightComponent();
+			if (SkyLightComp)
+			{
+				SkyLightComp->SetIntensity(1.0f);  // Ambient fill light
+				SkyLightComp->SetLightColor(FLinearColor(0.5f, 0.6f, 0.8f));  // Cool blue ambient
+				SkyLightComp->RecaptureSky();
+			}
+			UE_LOG(LogTemp, Log, TEXT("Spawned Sky Light for ambient illumination"));
+		}
 	}
 }
 

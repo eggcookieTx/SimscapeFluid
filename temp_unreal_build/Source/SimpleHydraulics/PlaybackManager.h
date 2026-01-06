@@ -271,6 +271,7 @@ protected:
 	void SpawnFromTopology();
 	void SpawnGridLayout();
 	void SpawnPipeSplines();
+	void SpawnSceneLighting();
 	void UpdateFlowParticles(float DeltaTime, const FSimulationFrame& Frame);
 	void SpawnFlowParticles();
 	void ClearFlowParticles();
