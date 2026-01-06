@@ -41,17 +41,28 @@ APlaybackManager::APlaybackManager()
 	MaxParticlesPerPipe = 8;
 	FlowSpeedScale = 100000.0f;  // cm/s per m³/s - for Niagara velocity parameter
 
-	// Load default Niagara system for flow visualization
-	// Using Fountain system which has built-in SpawnRate parameter
-	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> NiagaraSystemAsset(TEXT("/Niagara/Systems/Fountain"));
-	if (NiagaraSystemAsset.Succeeded())
+	// Load custom Niagara system for flow visualization
+	// Try custom system first, then fallback to Fountain, then fallback to sphere meshes
+	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> CustomSystemAsset(TEXT("/Game/Niagara/NS_FlowParticles"));
+	if (CustomSystemAsset.Succeeded())
 	{
-		FlowParticleSystem = NiagaraSystemAsset.Object;
-		UE_LOG(LogTemp, Log, TEXT("Loaded Niagara Fountain system for flow visualization"));
+		FlowParticleSystem = CustomSystemAsset.Object;
+		UE_LOG(LogTemp, Log, TEXT("Loaded custom Niagara system: /Game/Niagara/NS_FlowParticles"));
 	}
 	else
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Failed to load Niagara Fountain system - flow particles may not appear"));
+		// Fallback to Fountain system
+		static ConstructorHelpers::FObjectFinder<UNiagaraSystem> FountainAsset(TEXT("/Niagara/Systems/Fountain"));
+		if (FountainAsset.Succeeded())
+		{
+			FlowParticleSystem = FountainAsset.Object;
+			UE_LOG(LogTemp, Log, TEXT("Loaded Niagara Fountain system (fallback)"));
+		}
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("No Niagara system found - will use sphere mesh fallback for flow visualization"));
+			// FlowParticleSystem remains nullptr, SpawnFlowParticles will use sphere mesh fallback
+		}
 	}
 
 	// Load default meshes from Engine Content
@@ -950,16 +961,18 @@ void APlaybackManager::SpawnPipeSplines()
 void APlaybackManager::SpawnFlowParticles()
 {
 	UWorld* World = GetWorld();
-	if (!World || PipeSplineActors.Num() == 0 || !FlowParticleSystem)
+	if (!World || PipeSplineActors.Num() == 0)
 	{
-		if (!FlowParticleSystem)
-		{
-			UE_LOG(LogTemp, Error, TEXT("FlowParticleSystem not set - cannot spawn flow visualization. Make sure Niagara Fountain system is available."));
-		}
-		else
-		{
-			UE_LOG(LogTemp, Warning, TEXT("No pipes to attach flow particles (PipeSplineActors=%d)"), PipeSplineActors.Num());
-		}
+		UE_LOG(LogTemp, Warning, TEXT("Cannot spawn flow particles: World=%s, PipeSplineActors=%d"),
+			World ? TEXT("Valid") : TEXT("NULL"), PipeSplineActors.Num());
+		return;
+	}
+
+	// If no Niagara system available, use sphere mesh fallback
+	if (!FlowParticleSystem)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("No Niagara system available - using sphere mesh fallback for flow visualization"));
+		SpawnFlowParticlesSpheres();  // Use proven sphere mesh approach
 		return;
 	}
 
@@ -1044,6 +1057,10 @@ void APlaybackManager::ClearFlowParticles()
 			Particle.NiagaraComponent->DeactivateImmediate();
 			Particle.NiagaraComponent->DestroyComponent();
 		}
+		if (Particle.SphereActor)
+		{
+			Particle.SphereActor->Destroy();
+		}
 	}
 	FlowParticles.Empty();
 }
@@ -1060,7 +1077,7 @@ void APlaybackManager::UpdateFlowParticles(float DeltaTime, const FSimulationFra
 
 	for (FFlowParticle& Particle : FlowParticles)
 	{
-		if (!Particle.NiagaraComponent || Particle.PipeIndex < 0 || Particle.PipeIndex >= PipeConnections.Num())
+		if (Particle.PipeIndex < 0 || Particle.PipeIndex >= PipeConnections.Num())
 		{
 			continue;
 		}
@@ -1074,30 +1091,149 @@ void APlaybackManager::UpdateFlowParticles(float DeltaTime, const FSimulationFra
 			FlowValue = Frame.Flow[Pipe.FlowDataIndex];  // m³/s
 		}
 
-		// Debug log for first pipe
-		if (bShouldLog && Particle.PipeIndex == 0)
+		// Update Niagara particles if available
+		if (Particle.NiagaraComponent)
 		{
-			UE_LOG(LogTemp, Log, TEXT("Pipe 0 Flow: %.6f m³/s, Niagara velocity: %.1f cm/s"), 
-				FlowValue, FlowValue * FlowSpeedScale);
+			// Debug log for first pipe
+			if (bShouldLog && Particle.PipeIndex == 0)
+			{
+				UE_LOG(LogTemp, Log, TEXT("Pipe 0 Flow: %.6f m³/s, Niagara velocity: %.1f cm/s"), 
+					FlowValue, FlowValue * FlowSpeedScale);
+			}
+
+			// Convert flow to Niagara parameters
+			float FlowMagnitude = FMath::Abs(FlowValue);
+			float Velocity = FlowValue * FlowSpeedScale;  // cm/s - direction preserved
+			
+			// Spawn rate based on flow magnitude: more flow = more particles
+			float SpawnRate = FMath::Clamp(FlowMagnitude * 100000.0f, 0.0f, 100.0f);
+
+			// Update Niagara parameters
+			Particle.NiagaraComponent->SetFloatParameter(FName("SpawnRate"), SpawnRate);
+			Particle.NiagaraComponent->SetFloatParameter(FName("Velocity"), Velocity);
+			Particle.NiagaraComponent->SetFloatParameter(FName("ParticleLifetime"), 2.0f);
+			
+			// Optional: Adjust particle size based on flow magnitude
+			float ParticleSize = FMath::Clamp(FlowMagnitude * 5000.0f, 5.0f, 20.0f);
+			Particle.NiagaraComponent->SetFloatParameter(FName("ParticleSize"), ParticleSize);
 		}
+		// Update sphere actors if using fallback
+		else if (Particle.SphereActor)
+		{
+			// Move sphere along spline based on flow velocity
+			float Speed = FlowValue * FlowSpeedScale;  // cm/s
+			Particle.DistanceAlongSpline += Speed * DeltaTime;
 
-		// Convert flow to Niagara parameters
-		float FlowMagnitude = FMath::Abs(FlowValue);
-		float Velocity = FlowValue * FlowSpeedScale;  // cm/s - direction preserved (positive/negative)
-		
-		// Spawn rate based on flow magnitude: more flow = more particles
-		// Scale spawn rate from 0 to 100 particles/sec based on flow
-		float SpawnRate = FMath::Clamp(FlowMagnitude * 100000.0f, 0.0f, 100.0f);  // 0-100 particles/sec
+			// Wrap around when reaching end of spline
+			if (Particle.DistanceAlongSpline >= Particle.SplineLength)
+			{
+				Particle.DistanceAlongSpline = 0.0f;
+			}
+			else if (Particle.DistanceAlongSpline < 0.0f)
+			{
+				Particle.DistanceAlongSpline = Particle.SplineLength;
+			}
 
-		// Update Niagara parameters
-		Particle.NiagaraComponent->SetFloatParameter(FName("SpawnRate"), SpawnRate);
-		Particle.NiagaraComponent->SetFloatParameter(FName("Velocity"), Velocity);
-		Particle.NiagaraComponent->SetFloatParameter(FName("ParticleLifetime"), 2.0f);  // Particles live 2 seconds
-		
-		// Optional: Adjust particle size based on flow magnitude
-		float ParticleSize = FMath::Clamp(FlowMagnitude * 5000.0f, 5.0f, 20.0f);  // 5-20cm particles
-		Particle.NiagaraComponent->SetFloatParameter(FName("ParticleSize"), ParticleSize);
+			// Update position along spline
+			AActor* PipeActor = PipeSplineActors[Particle.PipeIndex];
+			if (PipeActor)
+			{
+				USplineComponent* SplineComp = PipeActor->FindComponentByClass<USplineComponent>();
+				if (SplineComp)
+				{
+					FVector SplinePos = SplineComp->GetLocationAtDistanceAlongSpline(
+						Particle.DistanceAlongSpline, ESplineCoordinateSpace::World);
+					Particle.SphereActor->SetActorLocation(SplinePos + FVector(0, 0, 40.0f));
+				}
+			}
+		}
 	}
 
 	LogCounter++;
+}
+
+void APlaybackManager::SpawnFlowParticlesSpheres()
+{
+	UWorld* World = GetWorld();
+	if (!World || PipeSplineActors.Num() == 0)
+	{
+		return;
+	}
+
+	ClearFlowParticles();
+
+	UE_LOG(LogTemp, Warning, TEXT("==== Spawning sphere mesh flow particles (fallback) for %d pipes ===="), PipeSplineActors.Num());
+
+	// Load sphere mesh for particles
+	UStaticMesh* SphereMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere"));
+	if (!SphereMesh)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to load sphere mesh for flow particles!"));
+		return;
+	}
+
+	// Spawn multiple sphere actors per pipe
+	for (int32 PipeIdx = 0; PipeIdx < PipeSplineActors.Num(); ++PipeIdx)
+	{
+		AActor* PipeActor = PipeSplineActors[PipeIdx];
+		if (!PipeActor)
+		{
+			continue;
+		}
+
+		USplineComponent* SplineComp = PipeActor->FindComponentByClass<USplineComponent>();
+		if (!SplineComp)
+		{
+			continue;
+		}
+
+		float SplineLength = SplineComp->GetSplineLength();
+
+		// Spawn MaxParticlesPerPipe spheres evenly distributed along the spline
+		for (int32 ParticleIdx = 0; ParticleIdx < MaxParticlesPerPipe; ++ParticleIdx)
+		{
+			// Calculate initial position along spline
+			float InitialDistance = (SplineLength / MaxParticlesPerPipe) * ParticleIdx;
+
+			// Spawn sphere actor
+			FActorSpawnParameters SpawnParams;
+			SpawnParams.Owner = this;
+			AActor* SphereActor = World->SpawnActor<AActor>(AActor::StaticClass(), FTransform::Identity, SpawnParams);
+
+			if (SphereActor)
+			{
+				// Add static mesh component
+				UStaticMeshComponent* MeshComp = NewObject<UStaticMeshComponent>(SphereActor);
+				MeshComp->SetStaticMesh(SphereMesh);
+				MeshComp->SetMobility(EComponentMobility::Movable);
+				MeshComp->SetWorldScale3D(FVector(0.2f, 0.2f, 0.2f));  // 20cm diameter spheres
+				MeshComp->RegisterComponent();
+				SphereActor->SetRootComponent(MeshComp);
+
+				// Create cyan material for water-like appearance
+				UMaterialInstanceDynamic* SphereMat = UMaterialInstanceDynamic::Create(PressureMaterial, this);
+				if (SphereMat)
+				{
+					SphereMat->SetScalarParameterValue(FName("Pressure"), 0.5f);  // Cyan-ish color
+				}
+				MeshComp->SetMaterial(0, SphereMat);
+
+				// Set initial position on spline (40cm above for visibility)
+				FVector SplinePos = SplineComp->GetLocationAtDistanceAlongSpline(InitialDistance, ESplineCoordinateSpace::World);
+				SphereActor->SetActorLocation(SplinePos + FVector(0, 0, 40.0f));
+
+				// Store particle data
+				FFlowParticle Particle;
+				Particle.SphereActor = SphereActor;
+				Particle.PipeIndex = PipeIdx;
+				Particle.DistanceAlongSpline = InitialDistance;
+				Particle.SplineLength = SplineLength;
+				FlowParticles.Add(Particle);
+			}
+		}
+
+		UE_LOG(LogTemp, Warning, TEXT("  Pipe %d: Spawned %d sphere particles"), PipeIdx, MaxParticlesPerPipe);
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("==== Spawned %d sphere particles across %d pipes ===="), FlowParticles.Num(), PipeSplineActors.Num());
 }

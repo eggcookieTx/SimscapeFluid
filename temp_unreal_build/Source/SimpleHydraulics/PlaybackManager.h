@@ -81,11 +81,23 @@ struct FFlowParticle
 	UNiagaraComponent* NiagaraComponent;
 
 	UPROPERTY()
+	AActor* SphereActor;  // Fallback sphere mesh actor
+
+	UPROPERTY()
 	int32 PipeIndex;
+
+	UPROPERTY()
+	float DistanceAlongSpline;  // For sphere mesh movement
+
+	UPROPERTY()
+	float SplineLength;  // Cached spline length
 
 	FFlowParticle()
 		: NiagaraComponent(nullptr)
+		, SphereActor(nullptr)
 		, PipeIndex(-1)
+		, DistanceAlongSpline(0.0f)
+		, SplineLength(0.0f)
 	{
 	}
 };
@@ -274,5 +286,6 @@ protected:
 	void SpawnSceneLighting();
 	void UpdateFlowParticles(float DeltaTime, const FSimulationFrame& Frame);
 	void SpawnFlowParticles();
+	void SpawnFlowParticlesSpheres();  // Fallback sphere mesh visualization
 	void ClearFlowParticles();
 };
